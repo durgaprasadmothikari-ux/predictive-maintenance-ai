@@ -36,29 +36,31 @@ machine_type = st.selectbox(
     ["L", "M", "H"]
 )
 
-air_temperature = st.number_input(
+# Text inputs (no + and - buttons)
+
+air_temperature = st.text_input(
     "Air Temperature (K)",
-    value=300.00
+    "300.00"
 )
 
-process_temperature = st.number_input(
+process_temperature = st.text_input(
     "Process Temperature (K)",
-    value=310.00
+    "310.00"
 )
 
-rotational_speed = st.number_input(
+rotational_speed = st.text_input(
     "Rotational Speed (RPM)",
-    value=1500
+    "1500"
 )
 
-torque = st.number_input(
+torque = st.text_input(
     "Torque (Nm)",
-    value=40.00
+    "40.00"
 )
 
-tool_wear = st.number_input(
+tool_wear = st.text_input(
     "Tool Wear (minutes)",
-    value=100
+    "100"
 )
 
 # -----------------------------------
@@ -67,49 +69,55 @@ tool_wear = st.number_input(
 
 if st.button("Predict Machine Failure"):
 
-    # Create input data
-    input_data = pd.DataFrame({
-        "Air temperature [K]": [air_temperature],
-        "Process temperature [K]": [process_temperature],
-        "Rotational speed [rpm]": [rotational_speed],
-        "Torque [Nm]": [torque],
-        "Tool wear [min]": [tool_wear],
-        "Type_L": [1 if machine_type == "L" else 0],
-        "Type_M": [1 if machine_type == "M" else 0]
-    })
+    try:
+        # Convert text values to numbers
+        air_temperature = float(air_temperature)
+        process_temperature = float(process_temperature)
+        rotational_speed = float(rotational_speed)
+        torque = float(torque)
+        tool_wear = float(tool_wear)
 
-    # Make prediction
-    prediction = model.predict(input_data)[0]
+        # Create input data
+        input_data = pd.DataFrame({
+            "Air temperature [K]": [air_temperature],
+            "Process temperature [K]": [process_temperature],
+            "Rotational speed [rpm]": [rotational_speed],
+            "Torque [Nm]": [torque],
+            "Tool wear [min]": [tool_wear],
+            "Type_L": [1 if machine_type == "L" else 0],
+            "Type_M": [1 if machine_type == "M" else 0]
+        })
 
-    # Display raw prediction
-    st.write("Raw prediction:", prediction)
+        # Make prediction
+        prediction = model.predict(input_data)[0]
 
-    # Display prediction probability
-    if hasattr(model, "predict_proba"):
+        # Display raw prediction
+        st.write("Raw prediction:", prediction)
 
-        probability = model.predict_proba(input_data)[0]
+        # Display prediction probability
+        if hasattr(model, "predict_proba"):
 
-        st.write(
-            "Prediction probabilities:",
-            probability
-        )
+            probability = model.predict_proba(input_data)[0]
 
-        # Show failure probability more clearly
-        failure_probability = probability[1] * 100
+            st.write(
+                "Prediction probabilities:",
+                probability
+            )
 
-        st.write(
-            f"Machine Failure Probability: {failure_probability:.2f}%"
-        )
+            failure_probability = probability[1] * 100
 
-    # Display final result
-    if prediction == 1:
+            st.write(
+                f"Machine Failure Probability: {failure_probability:.2f}%"
+            )
 
+        # Display final result
+        if prediction == 1:
+            st.error("⚠️ Machine Failure Predicted!")
+
+        else:
+            st.success("✅ No Machine Failure Predicted")
+
+    except ValueError:
         st.error(
-            "⚠️ Machine Failure Predicted!"
-        )
-
-    else:
-
-        st.success(
-            "✅ No Machine Failure Predicted"
+            "⚠️ Please enter valid numerical values in all fields."
         )
