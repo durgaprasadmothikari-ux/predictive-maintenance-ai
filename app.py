@@ -64,6 +64,11 @@ if st.button("Predict Machine Failure"):
 
     # Make prediction
     prediction = model.predict(input_data)[0]
+    st.write("Raw prediction:", prediction)
+
+if hasattr(model, "predict_proba"):
+    probability = model.predict_proba(input_data)[0]
+    st.write("Prediction probabilities:", probability)
 
     # Display result
     if prediction == 1:
