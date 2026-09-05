@@ -1,0 +1,104 @@
+{
+  "timestamp": "2026-09-05T08:50:14.081895",
+  "models": {
+    "ai4i_machine": {
+      "status": "trained",
+      "type": "Classification",
+      "algorithm": "Proficient HistGradientBoosting + Physics Feature Engineering",
+      "training_time_sec": 1.2,
+      "test_records": 2000,
+      "metrics": {
+        "accuracy": 0.9915,
+        "balanced_accuracy": 0.9176,
+        "precision": 0.9048,
+        "recall": 0.8382,
+        "f1_score": 0.8702,
+        "roc_auc": 0.9849,
+        "pr_auc": 0.9035,
+        "confusion_matrix": [
+          [
+            1926,
+            6
+          ],
+          [
+            11,
+            57
+          ]
+        ]
+      }
+    },
+    "electric_motor": {
+      "status": "trained",
+      "type": "Regression",
+      "algorithm": "Proficient ExtraTrees/RandomForest + Electromechanical Features",
+      "training_time_sec": 0.75,
+      "test_records": 2300,
+      "metrics": {
+        "mae_hours": 1085.25,
+        "rmse_hours": 1558.57,
+        "r2_score": 0.9452
+      }
+    },
+    "industrial_pump": {
+      "status": "trained",
+      "type": "Classification",
+      "algorithm": "Proficient Balanced RandomForest + Hydraulic Features",
+      "training_time_sec": 0.35,
+      "test_records": 2000,
+      "metrics": {
+        "accuracy": 0.993,
+        "precision": 0.898,
+        "recall": 0.8302,
+        "f1_score": 0.8627,
+        "roc_auc": 0.9761,
+        "pr_auc": 0.8708
+      }
+    },
+    "cnc_machine": {
+      "status": "trained",
+      "type": "Classification",
+      "algorithm": "Proficient Balanced RandomForest + Machining Stress Features",
+      "training_time_sec": 0.45,
+      "test_records": 2000,
+      "metrics": {
+        "accuracy": 0.9845,
+        "precision": 0.5098,
+        "recall": 0.8125,
+        "f1_score": 0.6265,
+        "roc_auc": 0.9924,
+        "pr_auc": 0.57
+      }
+    },
+    "conveyor_system": {
+      "status": "trained",
+      "type": "Classification",
+      "algorithm": "Proficient Balanced RandomForest + Belt Friction Features",
+      "training_time_sec": 0.4,
+      "test_records": 2000,
+      "metrics": {
+        "accuracy": 0.9965,
+        "precision": 0.375,
+        "recall": 0.6,
+        "f1_score": 0.4615,
+        "roc_auc": 0.998,
+        "pr_auc": 0.4348
+      }
+    },
+    "sensor_machine": {
+      "status": "trained",
+      "type": "Multi-Class Classification",
+      "algorithm": "Median Imputer + Balanced RandomForest (52 Sensors)",
+      "training_time_sec": 7.18,
+      "test_records": 44064,
+      "metrics": {
+        "accuracy": 0.9998,
+        "macro_f1": 0.6662,
+        "classes": [
+          "BROKEN",
+          "NORMAL",
+          "RECOVERING"
+        ]
+      }
+    }
+  }
+}
