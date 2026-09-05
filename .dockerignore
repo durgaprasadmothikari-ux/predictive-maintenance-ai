@@ -1,0 +1,8 @@
+venv/
+.git/
+.gitignore
+__pycache__/
+*.pyc
+data/sensor.csv
+*.md
+verify_system.py
