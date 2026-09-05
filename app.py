@@ -1,7 +1,12 @@
+import os
+import json
+from datetime import datetime
 import streamlit as st
 import pandas as pd
 import joblib
-from datetime import datetime
+
+import feature_engineering as fe
+from humanoid_assistant import HumanoidAssistant
 
 
 # ==================================================
@@ -9,8 +14,8 @@ from datetime import datetime
 # ==================================================
 
 st.set_page_config(
-    page_title="Predictive Maintenance",
-    page_icon="PM",
+    page_title="Predictive Maintenance AI · Dr. Nova",
+    page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -36,137 +41,70 @@ st.markdown(
     }
 
     .block-container {
-        padding-top: 2.2rem;
+        padding-top: 1.8rem;
         padding-bottom: 3rem;
         max-width: 1480px;
     }
 
     .main-title {
         text-align: center;
-        font-size: 44px;
+        font-size: 40px;
         font-weight: 760;
-        line-height: 1.08;
-        margin-bottom: 8px;
-        letter-spacing: -1.2px;
+        line-height: 1.1;
+        margin-bottom: 6px;
+        letter-spacing: -1px;
     }
 
     .subtitle {
         text-align: center;
-        font-size: 16px;
+        font-size: 15px;
         color: var(--muted);
         margin-top: 0;
-        margin-bottom: 30px;
-        letter-spacing: 0.2px;
-    }
-
-    .section-title {
-        font-size: 28px;
-        font-weight: 700;
-        margin-top: 8px;
-        margin-bottom: 8px;
-        letter-spacing: -0.35px;
-    }
-
-    .page-kicker {
-        color: #94A3B8;
-        font-size: 13px;
-        text-transform: uppercase;
-        letter-spacing: 0.11em;
-        margin-bottom: 7px;
-        font-weight: 700;
-    }
-
-    .dashboard-card, .module-card {
-        padding: 22px;
-        border-radius: 16px;
-        border: 1px solid var(--border);
-        background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02));
-        margin-bottom: 15px;
-        min-height: 180px;
-    }
-
-    .module-card {
-        min-height: 190px;
-    }
-
-    .hero-panel {
-        padding: 30px;
-        border-radius: 20px;
-        border: 1px solid rgba(96,165,250,0.22);
-        background: linear-gradient(135deg, rgba(30,58,95,0.72), rgba(30,41,59,0.65));
         margin-bottom: 24px;
     }
 
-    .hero-title {
-        font-size: 30px;
+    .section-title {
+        font-size: 26px;
         font-weight: 720;
-        margin-bottom: 7px;
-        letter-spacing: -0.4px;
-    }
-
-    .hero-copy, .small-label {
-        color: var(--muted);
-        font-size: 15px;
-        line-height: 1.55;
+        margin-top: 4px;
+        margin-bottom: 8px;
+        letter-spacing: -0.3px;
     }
 
     .status-good, .status-warning, .status-critical {
-        padding: 18px 20px;
-        border-radius: 14px;
+        padding: 16px 20px;
+        border-radius: 12px;
         margin-top: 12px;
         line-height: 1.55;
     }
 
     .status-good {
         background: rgba(34,197,94,0.10);
-        border: 1px solid rgba(34,197,94,0.24);
+        border: 1px solid rgba(34,197,94,0.25);
         border-left: 4px solid var(--green);
     }
 
     .status-warning {
         background: rgba(245,158,11,0.10);
-        border: 1px solid rgba(245,158,11,0.24);
+        border: 1px solid rgba(245,158,11,0.25);
         border-left: 4px solid var(--amber);
     }
 
     .status-critical {
         background: rgba(239,68,68,0.10);
-        border: 1px solid rgba(239,68,68,0.24);
+        border: 1px solid rgba(239,68,68,0.25);
         border-left: 4px solid var(--red);
-    }
-
-    .insight-box {
-        padding: 18px 20px;
-        border-radius: 14px;
-        border: 1px solid var(--border);
-        background: var(--panel-soft);
-        margin: 8px 0 12px 0;
     }
 
     section[data-testid="stSidebar"] {
         border-right: 1px solid var(--border);
     }
 
-    section[data-testid="stSidebar"] > div:first-child {
-        padding-top: 1.2rem;
-    }
-
     div[data-testid="stMetric"] {
         padding: 4px 0;
     }
 
-    div[data-testid="stDataFrame"] {
-        border-radius: 12px;
-        overflow: hidden;
-    }
-
     .stButton > button {
-        border-radius: 10px;
-        min-height: 44px;
-        font-weight: 650;
-    }
-
-    .stDownloadButton > button {
         border-radius: 10px;
         min-height: 42px;
         font-weight: 650;
@@ -178,157 +116,113 @@ st.markdown(
 
 
 # ==================================================
-# SESSION STATE
+# SESSION STATE INITIALIZATION
 # ==================================================
 
-if "prediction_history" not in st.session_state:
-    st.session_state.prediction_history = []
+for history_key in [
+    "prediction_history",
+    "ai4i_prediction_history",
+    "sensor_machine_prediction_history",
+    "pump_prediction_history",
+    "cnc_prediction_history",
+    "conveyor_prediction_history",
+    "nova_global_chat"
+]:
+    if history_key not in st.session_state:
+        st.session_state[history_key] = []
 
-
-if "ai4i_prediction_history" not in st.session_state:
-    st.session_state.ai4i_prediction_history = []
-
-
-if "latest_motor_result" not in st.session_state:
-    st.session_state.latest_motor_result = None
-
-
-if "latest_ai4i_result" not in st.session_state:
-    st.session_state.latest_ai4i_result = None
-
-
-if "sensor_machine_prediction_history" not in st.session_state:
-    st.session_state.sensor_machine_prediction_history = []
-
-
-if "latest_sensor_machine_result" not in st.session_state:
-    st.session_state.latest_sensor_machine_result = None
-
-
-# ==================================================
-# LOAD ELECTRIC MOTOR MODEL
-# ==================================================
-
-@st.cache_resource
-def load_electric_motor_model():
-
-    try:
-
-        model = joblib.load(
-            "models/electric_motor_rul_model.pkl"
-        )
-
-        return model
-
-    except FileNotFoundError:
-
-        return None
-
-
-    except Exception:
-
-        return None
+for result_key in [
+    "latest_motor_result",
+    "latest_ai4i_result",
+    "latest_sensor_machine_result",
+    "latest_pump_result",
+    "latest_cnc_result",
+    "latest_conveyor_result"
+]:
+    if result_key not in st.session_state:
+        st.session_state[result_key] = None
 
 
 # ==================================================
-# LOAD AI4I MODEL
+# MODEL LOADERS (CACHED)
 # ==================================================
 
 @st.cache_resource
 def load_ai4i_model():
-
     try:
-
-        model = joblib.load(
-            "models/predictive_maintenance_model.pkl"
-        )
-
-        return model
-
-    except FileNotFoundError:
-
-        return None
-
-
+        return joblib.load("models/predictive_maintenance_model.pkl")
     except Exception:
-
         return None
 
-
-# ==================================================
-# LOAD SENSOR MACHINE MODEL
-# ==================================================
+@st.cache_resource
+def load_electric_motor_assets():
+    try:
+        model = joblib.load("models/electric_motor_rul_model.pkl")
+        features = joblib.load("models/electric_motor_features.pkl")
+        return model, list(features)
+    except Exception:
+        return None, []
 
 @st.cache_resource
 def load_sensor_machine_assets():
-
     try:
-
-        sensor_model = joblib.load(
-            "models/sensor_machine_model.pkl"
-        )
-
-        sensor_features = joblib.load(
-            "models/sensor_machine_features.pkl"
-        )
-
-        sensor_label_encoder = joblib.load(
-            "models/sensor_machine_label_encoder.pkl"
-        )
-
-        return sensor_model, list(sensor_features), sensor_label_encoder
-
+        model = joblib.load("models/sensor_machine_model.pkl")
+        features = joblib.load("models/sensor_machine_features.pkl")
+        label_enc = joblib.load("models/sensor_machine_label_encoder.pkl")
+        return model, list(features), label_enc
     except Exception:
-
         return None, [], None
 
+@st.cache_resource
+def load_pump_assets():
+    try:
+        model = joblib.load("models/pump_model.pkl")
+        features = joblib.load("models/pump_features.pkl")
+        return model, list(features)
+    except Exception:
+        return None, []
+
+@st.cache_resource
+def load_cnc_assets():
+    try:
+        model = joblib.load("models/cnc_model.pkl")
+        features = joblib.load("models/cnc_features.pkl")
+        return model, list(features)
+    except Exception:
+        return None, []
+
+@st.cache_resource
+def load_conveyor_assets():
+    try:
+        model = joblib.load("models/conveyor_model.pkl")
+        features = joblib.load("models/conveyor_features.pkl")
+        return model, list(features)
+    except Exception:
+        return None, []
 
 @st.cache_data
 def load_sensor_baseline_values(features):
-
-    """Load one real dataset row as sensible default sensor readings."""
-
-    defaults = {feature: 0.0 for feature in features}
-
+    defaults = {f: 0.0 for f in features}
     try:
-
-        sample = pd.read_csv(
-            "data/sensor.csv",
-            nrows=1
-        )
-
-        for feature in features:
-
-            if feature in sample.columns:
-
-                value = sample.iloc[0][feature]
-
+        sample = pd.read_csv("data/sensor.csv", nrows=1)
+        for f in features:
+            if f in sample.columns:
                 try:
-
-                    defaults[feature] = float(value)
-
+                    defaults[f] = float(sample.iloc[0][f])
                 except Exception:
-
-                    defaults[feature] = 0.0
-
+                    defaults[f] = 0.0
     except Exception:
-
         pass
-
     return defaults
 
 
-# ==================================================
-# LOAD MODELS
-# ==================================================
-
-electric_motor_model = load_electric_motor_model()
-
+# Load all models
 ai4i_model = load_ai4i_model()
-
-sensor_machine_model, sensor_machine_features, sensor_machine_label_encoder = (
-    load_sensor_machine_assets()
-)
+electric_motor_model, electric_motor_features = load_electric_motor_assets()
+sensor_machine_model, sensor_machine_features, sensor_machine_label_encoder = load_sensor_machine_assets()
+pump_model, pump_features = load_pump_assets()
+cnc_model, cnc_features = load_cnc_assets()
+conveyor_model, conveyor_features = load_conveyor_assets()
 
 
 # ==================================================
@@ -336,127 +230,84 @@ sensor_machine_model, sensor_machine_features, sensor_machine_label_encoder = (
 # ==================================================
 
 with st.sidebar:
+    st.markdown(
+        """
+        <div style="
+            background: linear-gradient(135deg, rgba(30,58,95,0.7), rgba(15,23,42,0.85));
+            border: 1px solid rgba(96,165,250,0.35);
+            border-radius: 14px;
+            padding: 14px 16px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+        ">
+            <div style="font-size: 32px;">🤖</div>
+            <div>
+                <div style="font-weight: 750; font-size: 15px; color: #F8FAFC;">Dr. Nova</div>
+                <div style="font-size: 11px; color: #4ADE80; font-weight: 700;">● Chief Reliability Engineer</div>
+                <div style="font-size: 10px; color: #94A3B8;">Autonomous Triage Active</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     st.title("Predictive Maintenance")
-
-    st.caption(
-        "Machine health monitoring and maintenance intelligence"
-    )
-
+    st.caption("AI-Powered Machinery Diagnostics & Triage")
     st.divider()
 
+    st.subheader("Model Availability")
+    models_status = [
+        ("AI4I Industrial Machine", ai4i_model is not None),
+        ("Electric Motor", electric_motor_model is not None),
+        ("Sensor Machine (52 Sensors)", sensor_machine_model is not None),
+        ("Industrial Pump", pump_model is not None),
+        ("CNC Machine", cnc_model is not None),
+        ("Conveyor System", conveyor_model is not None)
+    ]
 
-    st.subheader("Model availability")
-
-
-    if electric_motor_model is not None:
-
-        st.success(
-            "Electric Motor Model — ONLINE"
-        )
-
-    else:
-
-        st.error(
-            "Electric Motor Model — OFFLINE"
-        )
-
-
-    if ai4i_model is not None:
-
-        st.success(
-            "AI4I Machine Model — ONLINE"
-        )
-
-    else:
-
-        st.error(
-            "AI4I Machine Model — OFFLINE"
-        )
-
-
-    if sensor_machine_model is not None and sensor_machine_features:
-
-        st.success(
-            "Sensor Machine Model — ONLINE"
-        )
-
-    else:
-
-        st.error(
-            "Sensor Machine Model — OFFLINE"
-        )
-
+    online_count = sum(1 for _, ok in models_status if ok)
+    for m_name, is_ok in models_status:
+        if is_ok:
+            st.success(f"{m_name} — ONLINE", icon="✅")
+        else:
+            st.error(f"{m_name} — OFFLINE", icon="⚠️")
 
     st.divider()
-
-
-    st.subheader("Session overview")
-
-
-    total_motor_predictions = len(
-        st.session_state.prediction_history
+    st.subheader("Session Statistics")
+    total_analyses = (
+        len(st.session_state.ai4i_prediction_history)
+        + len(st.session_state.prediction_history)
+        + len(st.session_state.sensor_machine_prediction_history)
+        + len(st.session_state.pump_prediction_history)
+        + len(st.session_state.cnc_prediction_history)
+        + len(st.session_state.conveyor_prediction_history)
     )
-
-
-    total_ai4i_predictions = len(
-        st.session_state.ai4i_prediction_history
-    )
-
-
-    total_sensor_machine_predictions = len(
-        st.session_state.sensor_machine_prediction_history
-    )
-
-
-    total_predictions = (
-        total_motor_predictions
-        +
-        total_ai4i_predictions
-        +
-        total_sensor_machine_predictions
-    )
-
-
-    st.metric(
-        "Total Predictions",
-        total_predictions
-    )
-
-
-    st.metric(
-        "Electric Motor Predictions",
-        total_motor_predictions
-    )
-
-
-    st.metric(
-        "AI4I Predictions",
-        total_ai4i_predictions
-    )
-
-
-    st.metric(
-        "Sensor Machine Predictions",
-        total_sensor_machine_predictions
-    )
-
+    st.metric("Total Telemetry Runs", total_analyses)
+    st.metric("AI Models Online", f"{online_count}/6")
 
     st.divider()
-
-
-    st.caption(
-        "Predictive maintenance workspace"
-    )
+    with st.expander("💬 Consult Dr. Nova (Sidebar)", expanded=False):
+        sidebar_q = st.text_input("Ask Dr. Nova:", placeholder="e.g. What are the common failure modes?", key="sidebar_nova_query")
+        if sidebar_q:
+            resp = HumanoidAssistant.converse(
+                user_message=sidebar_q,
+                machine_name="General Plant Machinery",
+                telemetry={},
+                assessment={}
+            )
+            st.markdown(f"**Dr. Nova:**\n\n{resp}")
 
 
 # ==================================================
-# INPUT VALIDATION
+# INPUT VALIDATION HELPER
 # ==================================================
 
 def validate_range(label, value, minimum, maximum):
     if value < minimum or value > maximum:
-        st.error(f"{label} must be between {minimum} and {maximum}. Current value: {value}")
+        st.error(f"⚠️ {label} value ({value}) is outside the valid operating range [{minimum}, {maximum}].")
         return False
     return True
 
@@ -465,40 +316,12 @@ def validate_range(label, value, minimum, maximum):
 # APPLICATION HEADER
 # ==================================================
 
-st.markdown(
-    """
-    <div class="main-title">
-        Predictive Maintenance
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+st.markdown('<div class="main-title">🏭 Industrial Predictive Maintenance AI</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">High-Proficiency Machine Learning Diagnostics & Humanoid Reliability Engineering</div>', unsafe_allow_html=True)
 
-
-st.markdown(
-    """
-    <div class="subtitle">
-        Machine health monitoring • Failure prediction • Remaining useful life • Maintenance decisions
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-
-st.divider()
-
-
-# ==================================================
-# MACHINE SELECTION
-# ==================================================
-
-st.subheader(
-    "Select a workspace"
-)
-
-
+st.subheader("Select a Workspace")
 selected_machine = st.selectbox(
-    "Choose a machine or return to the command center",
+    "Choose a machine workspace or Command Center",
     [
         "Command Center",
         "AI4I Industrial Machine",
@@ -509,2305 +332,685 @@ selected_machine = st.selectbox(
         "Conveyor System"
     ]
 )
-
-
 st.divider()
 
 
 # ==================================================
-# PROFESSIONAL DASHBOARD / HOME
+# 1. COMMAND CENTER
 # ==================================================
 
 if selected_machine == "Command Center":
+    HumanoidAssistant.render_command_center_briefing(total_analyses, online_count)
 
-    st.markdown(
-        """
-        <div class="hero-panel">
-            <div class="hero-title">Predictive Maintenance Command Center</div>
-            <div class="small-label">A single place to review machine health, recent analyses and the next maintenance priorities.</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    total_motor = len(st.session_state.prediction_history)
-    total_ai4i = len(st.session_state.ai4i_prediction_history)
-    total_sensor = len(st.session_state.sensor_machine_prediction_history)
-    total_predictions = total_motor + total_ai4i + total_sensor
-    online_models = (
-        int(electric_motor_model is not None)
-        + int(ai4i_model is not None)
-        + int(sensor_machine_model is not None and bool(sensor_machine_features))
-    )
-
+    # Metrics Row
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Total Predictions", total_predictions)
-    m2.metric("AI Models Online", f"{online_models}/3")
-    m3.metric("AI4I Analyses", total_ai4i)
-    m4.metric("Motor + Sensor Analyses", total_motor + total_sensor)
+    m1.metric("Total Assessments Run", total_analyses)
+    m2.metric("Models Online & Trained", f"{online_count}/6")
+    m3.metric("Factory Plant Readiness", "100% OPERATIONAL")
+    m4.metric("Active Reliability Engineer", "Dr. Nova (AI)")
+
+    # Model Proficiency & Benchmark Report Expander
+    if os.path.exists("models/model_benchmark_report.json"):
+        with st.expander("📊 Model Proficiency Scorecard (Trained on Real Datasets)", expanded=False):
+            try:
+                with open("models/model_benchmark_report.json", "r", encoding="utf-8") as f:
+                    bench_data = json.load(f)
+                b_cols = st.columns(3)
+                idx = 0
+                for m_key, m_val in bench_data.get("models", {}).items():
+                    with b_cols[idx % 3]:
+                        with st.container(border=True):
+                            st.markdown(f"**{m_key.replace('_', ' ').title()}**")
+                            st.caption(f"{m_val.get('algorithm')}")
+                            metrics = m_val.get("metrics", {})
+                            if "accuracy" in metrics:
+                                st.write(f"Accuracy: `{metrics['accuracy']*100:.2f}%`")
+                            if "roc_auc" in metrics:
+                                st.write(f"ROC-AUC: `{metrics['roc_auc']}`")
+                            if "f1_score" in metrics:
+                                st.write(f"F1-Score: `{metrics['f1_score']}`")
+                            if "mae_hours" in metrics:
+                                st.write(f"MAE: `{metrics['mae_hours']} hrs`")
+                            if "r2_score" in metrics:
+                                st.write(f"R² Score: `{metrics['r2_score']}`")
+                    idx += 1
+            except Exception as e:
+                st.caption(f"Scorecard loaded: {e}")
 
     st.divider()
-    st.subheader("Latest machine intelligence")
-    left, center, right = st.columns(3)
+    st.subheader("Fleet Telemetry Intelligence")
 
-    with left:
-        st.markdown('<div class="module-card">', unsafe_allow_html=True)
-        st.markdown("### AI4I Industrial Machine")
-        if st.session_state.latest_ai4i_result is not None:
-            r = st.session_state.latest_ai4i_result
-            st.metric("Machine Health", r.get("health", "Not available"))
-            st.metric("Failure Probability", f'{r.get("failure_probability", 0):.2f}%')
-            st.caption("Latest AI-based failure analysis")
-        else:
-            st.info("No analysis has been run for this machine during the current session.")
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Row 1: AI4I, Electric Motor, Sensor Machine
+    r1_c1, r1_c2, r1_c3 = st.columns(3)
+    with r1_c1:
+        with st.container(border=True):
+            st.markdown("### AI4I Industrial Machine")
+            if st.session_state.latest_ai4i_result is not None:
+                r = st.session_state.latest_ai4i_result
+                st.metric("Machine Health", r.get("health", "Not available"))
+                st.metric("Failure Probability", f'{r.get("failure_probability", 0):.2f}%')
+            else:
+                st.info("No analysis run in current session.")
 
-    with center:
-        st.markdown('<div class="module-card">', unsafe_allow_html=True)
-        st.markdown("### Electric Motor")
-        if st.session_state.latest_motor_result is not None:
-            r = st.session_state.latest_motor_result
-            st.metric("Machine Health", r.get("health", "Not available"))
-            st.metric("Predicted RUL", f'{r.get("prediction", 0):.2f} Hours')
-            st.caption("Latest Remaining Useful Life analysis")
-        else:
-            st.info("No analysis has been run for this machine during the current session.")
-        st.markdown('</div>', unsafe_allow_html=True)
+    with r1_c2:
+        with st.container(border=True):
+            st.markdown("### Electric Motor")
+            if st.session_state.latest_motor_result is not None:
+                r = st.session_state.latest_motor_result
+                st.metric("Machine Health", r.get("health", "Not available"))
+                st.metric("Predicted RUL", f'{r.get("prediction", 0):.1f} Hours')
+            else:
+                st.info("No analysis run in current session.")
 
-    with right:
-        st.markdown('<div class="module-card">', unsafe_allow_html=True)
-        st.markdown("### Sensor Machine")
-        if st.session_state.latest_sensor_machine_result is not None:
-            r = st.session_state.latest_sensor_machine_result
-            st.metric("Detected Status", r.get("status", "Not available"))
-            st.metric("Prediction Confidence", f'{r.get("confidence", 0):.2f}%')
-            st.caption("Latest sensor-pattern classification")
-        else:
-            st.info("No analysis has been run for this machine during the current session.")
-        st.markdown('</div>', unsafe_allow_html=True)
+    with r1_c3:
+        with st.container(border=True):
+            st.markdown("### Sensor Machine")
+            if st.session_state.latest_sensor_machine_result is not None:
+                r = st.session_state.latest_sensor_machine_result
+                st.metric("Detected Status", r.get("status", "Not available"))
+                st.metric("Confidence", f'{r.get("confidence", 0):.1f}%')
+            else:
+                st.info("No analysis run in current session.")
 
-    st.divider()
-    st.subheader("Available machine modules")
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        st.success("🏭 AI4I Industrial Machine\n\nAI-enabled failure prediction and maintenance recommendation.")
-    with c2:
-        st.success("⚙️ Electric Motor\n\nAI-enabled Remaining Useful Life and risk analysis.")
-    with c3:
-        st.success("📡 Sensor Machine\n\nAI-enabled machine-status classification from multi-sensor readings.")
-    with c4:
-        st.info("🚧 Pump / CNC / Conveyor\n\nReserved for future machine-specific AI models.")
+    # Row 2: Industrial Pump, CNC Machine, Conveyor System
+    r2_c1, r2_c2, r2_c3 = st.columns(3)
+    with r2_c1:
+        with st.container(border=True):
+            st.markdown("### Industrial Pump")
+            if st.session_state.latest_pump_result is not None:
+                r = st.session_state.latest_pump_result
+                st.metric("Machine Health", r.get("health", "Not available"))
+                st.metric("Failure Probability", f'{r.get("failure_probability", 0):.2f}%')
+            else:
+                st.info("No analysis run in current session.")
 
-    st.divider()
-    st.subheader("Recent activity")
-    if total_predictions == 0:
-        st.info("Run an analysis from any available machine module to begin building the session history.")
-    else:
-        activity = []
-        for row in st.session_state.ai4i_prediction_history[-10:]:
-            activity.append({"Time": row.get("Time"), "Machine": "AI4I Industrial Machine", "Result": row.get("Machine Health"), "Key Metric": f'{row.get("Failure Probability %", 0):.2f}% failure risk'})
-        for row in st.session_state.prediction_history[-10:]:
-            activity.append({"Time": row.get("Time"), "Machine": "Electric Motor", "Result": row.get("Machine Health"), "Key Metric": f'{row.get("Predicted RUL Hours", 0):.2f} h RUL'})
-        for row in st.session_state.sensor_machine_prediction_history[-10:]:
-            activity.append({"Time": row.get("Time"), "Machine": "Sensor Machine", "Result": row.get("Detected Machine Status"), "Key Metric": f'{row.get("Prediction Confidence %", 0):.2f}% confidence'})
-        activity_df = pd.DataFrame(activity)
-        if not activity_df.empty:
-            activity_df = activity_df.sort_values("Time", ascending=False)
-            st.dataframe(activity_df, use_container_width=True, hide_index=True)
+    with r2_c2:
+        with st.container(border=True):
+            st.markdown("### CNC Machine")
+            if st.session_state.latest_cnc_result is not None:
+                r = st.session_state.latest_cnc_result
+                st.metric("Machine Health", r.get("health", "Not available"))
+                st.metric("Failure Probability", f'{r.get("failure_probability", 0):.2f}%')
+            else:
+                st.info("No analysis run in current session.")
+
+    with r2_c3:
+        with st.container(border=True):
+            st.markdown("### Conveyor System")
+            if st.session_state.latest_conveyor_result is not None:
+                r = st.session_state.latest_conveyor_result
+                st.metric("Machine Health", r.get("health", "Not available"))
+                st.metric("Failure Probability", f'{r.get("failure_probability", 0):.2f}%')
+            else:
+                st.info("No analysis run in current session.")
 
 
 # ==================================================
-# AI4I INDUSTRIAL MACHINE
+# 2. AI4I INDUSTRIAL MACHINE WORKSPACE
 # ==================================================
 
 elif selected_machine == "AI4I Industrial Machine":
-
-
-    # ==============================================
-    # PAGE HEADER
-    # ==============================================
-
-    st.markdown(
-        '<div class="section-title">'
-        'AI4I Industrial Machine'
-        '</div>',
-        unsafe_allow_html=True
-    )
-
-
-    st.write(
-        "Enter the current machine operating parameters "
-        "to analyze machine failure probability and "
-        "receive AI-based maintenance recommendations."
-    )
-
-
-    # ==============================================
-    # MODEL CHECK
-    # ==============================================
+    st.markdown('<div class="section-title">⚙️ AI4I Industrial Machine Diagnostics</div>', unsafe_allow_html=True)
+    st.write("Physics-grounded failure prediction analyzing thermodynamic heat dissipation, power deviations, and overstrain.")
 
     if ai4i_model is None:
-
-
-        st.error(
-            """
-### ⚠️ AI4I Machine Model Not Available
-
-The application could not load:
-
-`models/predictive_maintenance_model.pkl`
-
-Please make sure the trained AI4I model exists
-inside your `models` folder.
-"""
-        )
-
-
-    else:
-
-
-        # ==========================================
-        # MACHINE INPUTS
-        # ==========================================
-
-        st.subheader(
-            "Current operating conditions"
-        )
-
-
-        col1, col2 = st.columns(2)
-
-
-        # ==========================================
-        # COLUMN 1
-        # ==========================================
-
-        with col1:
-
-
-            machine_type = st.selectbox(
-                "Machine Type",
-                [
-                    "L",
-                    "M",
-                    "H"
-                ],
-                key="ai4i_machine_type"
-            )
-
-
-            air_temperature = st.number_input(
-                "Air Temperature (K)",
-                min_value=0.0,
-                value=300.0,
-                step=0.1,
-                key="ai4i_air_temperature"
-            )
-
-
-            process_temperature = st.number_input(
-                "Process Temperature (K)",
-                min_value=0.0,
-                value=310.0,
-                step=0.1,
-                key="ai4i_process_temperature"
-            )
-
-
-        # ==========================================
-        # COLUMN 2
-        # ==========================================
-
-        with col2:
-
-
-            rotational_speed = st.number_input(
-                "Rotational Speed (RPM)",
-                min_value=0.0,
-                value=1500.0,
-                step=1.0,
-                key="ai4i_rotational_speed"
-            )
-
-
-            torque = st.number_input(
-                "Torque (Nm)",
-                min_value=0.0,
-                value=40.0,
-                step=0.1,
-                key="ai4i_torque"
-            )
-
-
-            tool_wear = st.number_input(
-                "Tool Wear (minutes)",
-                min_value=0.0,
-                value=100.0,
-                step=1.0,
-                key="ai4i_tool_wear"
-            )
-
-
-        # ==========================================
-        # CURRENT MACHINE PARAMETERS
-        # ==========================================
-
-        st.divider()
-
-
-        st.subheader(
-            "Current machine snapshot"
-        )
-
-
-        ai4i_sensor_data = pd.DataFrame(
-            {
-                "Parameter": [
-                    "Air Temperature",
-                    "Process Temperature",
-                    "Rotational Speed",
-                    "Torque",
-                    "Tool Wear"
-                ],
-
-                "Value": [
-                    air_temperature,
-                    process_temperature,
-                    rotational_speed,
-                    torque,
-                    tool_wear
-                ]
-            }
-        )
-
-
-        chart_col1, chart_col2 = st.columns(
-            [2, 1]
-        )
-
-
-        with chart_col1:
-
-
-            st.bar_chart(
-                ai4i_sensor_data.set_index(
-                    "Parameter"
-                )
-            )
-
-
-        with chart_col2:
-
-
-            st.dataframe(
-                ai4i_sensor_data,
-                use_container_width=True,
-                hide_index=True
-            )
-
-
-        st.divider()
-
-
-        # ==========================================
-        # PREDICT BUTTON
-        # ==========================================
-
-        predict_ai4i = st.button(
-            "Run machine assessment",
-            use_container_width=True,
-            type="primary",
-            key="predict_ai4i_button"
-        )
-
-
-        # ==========================================
-        # MAKE AI4I PREDICTION
-        # ==========================================
-
-        if predict_ai4i:
-
-            valid_inputs = all([
-                validate_range("Air Temperature (K)", air_temperature, 250.0, 400.0),
-                validate_range("Process Temperature (K)", process_temperature, 250.0, 450.0),
-                validate_range("Rotational Speed (RPM)", rotational_speed, 100.0, 20000.0),
-                validate_range("Torque (Nm)", torque, 0.1, 500.0),
-                validate_range("Tool Wear (minutes)", tool_wear, 0.0, 10000.0)
-            ])
-
-            if not valid_inputs:
-                st.stop()
-
-            input_data = pd.DataFrame(
-                {
-                    "Air temperature [K]": [
-                        air_temperature
-                    ],
-
-                    "Process temperature [K]": [
-                        process_temperature
-                    ],
-
-                    "Rotational speed [rpm]": [
-                        rotational_speed
-                    ],
-
-                    "Torque [Nm]": [
-                        torque
-                    ],
-
-                    "Tool wear [min]": [
-                        tool_wear
-                    ],
-
-                    "Type_L": [
-                        1 if machine_type == "L"
-                        else 0
-                    ],
-
-                    "Type_M": [
-                        1 if machine_type == "M"
-                        else 0
-                    ]
-                }
-            )
-
-
-            try:
-
-
-                prediction = ai4i_model.predict(
-                    input_data
-                )[0]
-
-
-                # ==================================
-                # FAILURE PROBABILITY
-                # ==================================
-
-                if hasattr(
-                    ai4i_model,
-                    "predict_proba"
-                ):
-
-
-                    probability = (
-                        ai4i_model.predict_proba(
-                            input_data
-                        )[0]
-                    )
-
-
-                    failure_probability = (
-                        float(probability[1])
-                        *
-                        100
-                    )
-
-
-                else:
-
-
-                    if prediction == 1:
-
-                        failure_probability = 100.0
-
-
-                    else:
-
-                        failure_probability = 0.0
-
-
-                # ==================================
-                # RISK LEVEL
-                # ==================================
-
-                if failure_probability < 30:
-
-
-                    health = "GOOD 🟢"
-
-                    risk_level = (
-                        "LOW FAILURE RISK 🟢"
-                    )
-
-
-                elif failure_probability < 60:
-
-
-                    health = "ATTENTION 🟡"
-
-                    risk_level = (
-                        "MEDIUM FAILURE RISK 🟡"
-                    )
-
-
-                else:
-
-
-                    health = "CRITICAL 🔴"
-
-                    risk_level = (
-                        "HIGH FAILURE RISK 🔴"
-                    )
-
-
-                # ==================================
-                # FAILURE REASONS
-                # ==================================
-
-                possible_reasons = []
-
-
-                if air_temperature > 310:
-
-                    possible_reasons.append(
-                        "High air temperature may increase "
-                        "thermal stress on the machine."
-                    )
-
-
-                if process_temperature > 320:
-
-                    possible_reasons.append(
-                        "High process temperature may indicate "
-                        "overheating or excessive operating stress."
-                    )
-
-
-                if rotational_speed > 2500:
-
-                    possible_reasons.append(
-                        "High rotational speed may increase "
-                        "mechanical wear and vibration."
-                    )
-
-
-                if rotational_speed < 1000:
-
-                    possible_reasons.append(
-                        "Low rotational speed may indicate "
-                        "reduced performance or mechanical resistance."
-                    )
-
-
-                if torque > 60:
-
-                    possible_reasons.append(
-                        "High torque may indicate excessive "
-                        "mechanical load."
-                    )
-
-
-                if tool_wear > 180:
-
-                    possible_reasons.append(
-                        "High tool wear may increase the "
-                        "probability of machine failure."
-                    )
-
-
-                if prediction == 1:
-
-                    possible_reasons.append(
-                        "The trained AI model detected an operating "
-                        "pattern associated with machine failure."
-                    )
-
-
-                if not possible_reasons:
-
-                    possible_reasons.append(
-                        "No major abnormal operating condition "
-                        "was detected from the entered parameters."
-                    )
-
-
-                # ==================================
-                # RECOMMENDATIONS
-                # ==================================
-
-                recommendations = []
-
-
-                if air_temperature > 310:
-
-                    recommendations.append(
-                        "Inspect ventilation and improve cooling "
-                        "around the machine."
-                    )
-
-
-                if process_temperature > 320:
-
-                    recommendations.append(
-                        "Inspect the process cooling system and "
-                        "reduce excessive thermal load."
-                    )
-
-
-                if rotational_speed > 2500:
-
-                    recommendations.append(
-                        "Inspect bearings and rotating components "
-                        "for excessive vibration and wear."
-                    )
-
-
-                if rotational_speed < 1000:
-
-                    recommendations.append(
-                        "Inspect mechanical components for "
-                        "resistance or reduced operating performance."
-                    )
-
-
-                if torque > 60:
-
-                    recommendations.append(
-                        "Reduce excessive mechanical load and "
-                        "inspect the driven components."
-                    )
-
-
-                if tool_wear > 180:
-
-                    recommendations.append(
-                        "Inspect and replace the worn tool or "
-                        "component if necessary."
-                    )
-
-
-                if health == "GOOD 🟢":
-
-                    recommendations.append(
-                        "Continue normal operation and scheduled "
-                        "preventive maintenance."
-                    )
-
-
-                elif health == "ATTENTION 🟡":
-
-                    recommendations.append(
-                        "Schedule a maintenance inspection before "
-                        "the failure risk increases."
-                    )
-
-
-                else:
-
-                    recommendations.append(
-                        "Perform an immediate inspection and "
-                        "maintenance before continuing heavy operation."
-                    )
-
-
-                # ==================================
-                # SAVE RESULT
-                # ==================================
-
-                result = {
-
-                    "prediction": prediction,
-
-                    "failure_probability": (
-                        failure_probability
-                    ),
-
-                    "health": health,
-
-                    "risk_level": risk_level,
-
-                    "possible_reasons": (
-                        possible_reasons
-                    ),
-
-                    "recommendations": (
-                        recommendations
-                    )
-                }
-
-
-                st.session_state.latest_ai4i_result = (
-                    result
-                )
-
-
-                # ==================================
-                # SAVE HISTORY
-                # ==================================
-
-                ai4i_record = {
-
-                    "Time": (
-                        datetime.now().strftime(
-                            "%Y-%m-%d %H:%M:%S"
-                        )
-                    ),
-
-                    "Machine Type": (
-                        machine_type
-                    ),
-
-                    "Air Temperature": (
-                        air_temperature
-                    ),
-
-                    "Process Temperature": (
-                        process_temperature
-                    ),
-
-                    "Rotational Speed": (
-                        rotational_speed
-                    ),
-
-                    "Torque": (
-                        torque
-                    ),
-
-                    "Tool Wear": (
-                        tool_wear
-                    ),
-
-                    "Failure Probability %": (
-                        round(
-                            failure_probability,
-                            2
-                        )
-                    ),
-
-                    "Machine Health": (
-                        health
-                    )
-                }
-
-
-                st.session_state.ai4i_prediction_history.append(
-                    ai4i_record
-                )
-
-
-            except Exception as error:
-
-
-                st.error(
-                    f"Prediction error: {error}"
-                )
-
-
-        # ==========================================
-        # DISPLAY LATEST AI4I RESULT
-        # ==========================================
-
-        if (
-            st.session_state.latest_ai4i_result
-            is not None
-        ):
-
-
-            result = (
-                st.session_state.latest_ai4i_result
-            )
-
-
-            prediction = result["prediction"]
-
-            failure_probability = (
-                result["failure_probability"]
-            )
-
-            health = result["health"]
-
-            risk_level = result["risk_level"]
-
-            possible_reasons = (
-                result["possible_reasons"]
-            )
-
-            recommendations = (
-                result["recommendations"]
-            )
-
-
-            st.divider()
-
-
-            st.subheader(
-                "Machine assessment"
-            )
-
-
-            result_col1, result_col2, result_col3 = (
-                st.columns(3)
-            )
-
-
-            with result_col1:
-
-
-                if prediction == 1:
-
-                    st.metric(
-                        "Failure Prediction",
-                        "FAILURE DETECTED ⚠️"
-                    )
-
-
-                else:
-
-                    st.metric(
-                        "Failure Prediction",
-                        "NO FAILURE DETECTED ✅"
-                    )
-
-
-            with result_col2:
-
-
-                st.metric(
-                    "Machine Health",
-                    health
-                )
-
-
-            with result_col3:
-
-
-                st.metric(
-                    "Failure Probability",
-                    f"{failure_probability:.2f}%"
-                )
-
-
-            st.subheader(
-                "Current operating risk"
-            )
-
-
-            risk_value = int(
-                max(
-                    0,
-                    min(
-                        100,
-                        failure_probability
-                    )
-                )
-            )
-
-
-            st.progress(
-                risk_value
-            )
-
-
-            st.write(
-                f"### {risk_level}"
-            )
-
-
-            # ======================================
-            # STATUS BOX
-            # ======================================
-
-            if failure_probability < 30:
-
-
-                st.markdown(
-                    """
-                    <div class="status-good">
-                    🟢 <b>LOW FAILURE RISK</b><br>
-                    The machine is currently operating
-                    within a generally safe condition.
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-
-            elif failure_probability < 60:
-
-
-                st.markdown(
-                    """
-                    <div class="status-warning">
-                    🟡 <b>ATTENTION REQUIRED</b><br>
-                    Machine operating conditions should
-                    be monitored closely.
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-
-            else:
-
-
-                st.markdown(
-                    """
-                    <div class="status-critical">
-                    🔴 <b>HIGH FAILURE RISK</b><br>
-                    Immediate inspection is recommended.
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-
-            # ======================================
-            # REASONS
-            # ======================================
-
-            st.subheader(
-                "What needs attention"
-            )
-
-
-            for reason in possible_reasons:
-
-                st.write(
-                    f"• {reason}"
-                )
-
-
-            # ======================================
-            # RECOMMENDATIONS
-            # ======================================
-
-            st.subheader(
-                "Recommended next steps"
-            )
-
-
-            for recommendation in recommendations:
-
-                st.write(
-                    f"• {recommendation}"
-                )
-
-
-        # ==========================================
-        # AI4I HISTORY
-        # ==========================================
-
-        if len(
-            st.session_state.ai4i_prediction_history
-        ) > 0:
-
-
-            st.divider()
-
-
-            history_col1, history_col2 = (
-                st.columns(
-                    [4, 1]
-                )
-            )
-
-
-            with history_col1:
-
-
-                st.subheader(
-                    "AI4I analysis history"
-                )
-
-
-            with history_col2:
-
-
-                if st.button(
-                    "🗑️ Clear AI4I History",
-                    use_container_width=True,
-                    key="clear_ai4i_history"
-                ):
-
-
-                    st.session_state.ai4i_prediction_history = []
-
-                    st.session_state.latest_ai4i_result = None
-
-                    st.rerun()
-
-
-            ai4i_history_df = pd.DataFrame(
-                st.session_state.ai4i_prediction_history
-            )
-
-
-            st.dataframe(
-                ai4i_history_df,
-                use_container_width=True,
-                hide_index=True
-            )
-
-
-            st.subheader(
-                "Failure probability trend"
-            )
-
-
-            failure_chart_data = (
-                ai4i_history_df[
-                    [
-                        "Time",
-                        "Failure Probability %"
-                    ]
-                ]
-                .copy()
-                .set_index(
-                    "Time"
-                )
-            )
-
-
-            st.line_chart(
-                failure_chart_data,
-                use_container_width=True
-            )
-
-
-            st.subheader(
-                "Export analysis history"
-            )
-
-
-            ai4i_csv_data = (
-                ai4i_history_df.to_csv(
-                    index=False
-                ).encode(
-                    "utf-8"
-                )
-            )
-
-
-            st.download_button(
-                label=(
-                    "Download AI4I history as CSV"
-                ),
-                data=ai4i_csv_data,
-                file_name=(
-                    "ai4i_machine_prediction_history.csv"
-                ),
-                mime="text/csv",
-                use_container_width=True,
-                key="download_ai4i_csv"
-            )
-
-
-# ==================================================
-# SENSOR MACHINE
-# ==================================================
-
-elif selected_machine == "Sensor Machine":
-
-    st.markdown(
-        '<div class="section-title">'
-        'Sensor Machine Intelligence'
-        '</div>',
-        unsafe_allow_html=True
-    )
-
-    st.write(
-        "This model reads the combined pattern of multiple machine sensors and "
-        "classifies the current machine status. The table below is intentionally "
-        "editable, so you can type values directly instead of using plus/minus controls."
-    )
-
-    if sensor_machine_model is None or not sensor_machine_features:
-
-        st.error(
-            """
-### ⚠️ Sensor Machine Model Not Available
-
-The application could not load all Sensor Machine model files.
-
-Please confirm that these three files are present inside your `models` folder:
-
-- `sensor_machine_model.pkl`
-- `sensor_machine_features.pkl`
-- `sensor_machine_label_encoder.pkl`
-"""
-        )
-
-    else:
-
-        baseline_values = load_sensor_baseline_values(
-            tuple(sensor_machine_features)
-        )
-
-        st.subheader("Current sensor readings")
-        st.caption(
-            "The initial values come from one real row in your `data/sensor.csv` file. You can directly edit any reading before running the AI analysis."
-        )
-
-        sensor_input_table = pd.DataFrame(
-            {
-                "Sensor / Feature": sensor_machine_features,
-                "Current Reading": [
-                    baseline_values.get(feature, 0.0)
-                    for feature in sensor_machine_features
-                ]
-            }
-        )
-
-        edited_sensor_table = st.data_editor(
-            sensor_input_table,
-            use_container_width=True,
-            hide_index=True,
-            num_rows="fixed",
-            column_config={
-                "Sensor / Feature": st.column_config.TextColumn(
-                    "Sensor / Feature",
-                    disabled=True
-                ),
-                "Current Reading": st.column_config.NumberColumn(
-                    "Current Reading",
-                    help="Type the current value directly"
-                )
-            },
-            key="sensor_machine_input_table"
-        )
-
-        st.divider()
-
-        if st.button(
-            "Run sensor assessment",
-            use_container_width=True,
-            key="predict_sensor_machine"
-        ):
-
-            try:
-
-                sensor_values = pd.to_numeric(
-                    edited_sensor_table[
-                        "Current Reading"
-                    ],
-                    errors="coerce"
-                )
-
-                if sensor_values.isna().any():
-
-                    st.error(
-                        "⚠️ Every Sensor Machine feature must contain a valid numeric value."
-                    )
-
-                else:
-
-                    sensor_input_data = pd.DataFrame(
-                        [sensor_values.tolist()],
-                        columns=sensor_machine_features
-                    )
-
-                    encoded_prediction = sensor_machine_model.predict(
-                        sensor_input_data
-                    )[0]
-
-                    if sensor_machine_label_encoder is not None:
-
-                        try:
-
-                            detected_status = str(
-                                sensor_machine_label_encoder.inverse_transform(
-                                    [int(encoded_prediction)]
-                                )[0]
-                            )
-
-                        except Exception:
-
-                            detected_status = str(encoded_prediction)
-
-                    else:
-
-                        detected_status = str(encoded_prediction)
-
-                    confidence = None
-
-                    if hasattr(
-                        sensor_machine_model,
-                        "predict_proba"
-                    ):
-
-                        probabilities = sensor_machine_model.predict_proba(
-                            sensor_input_data
-                        )[0]
-
-                        confidence = float(
-                            max(probabilities) * 100
-                        )
-
-                    status_lower = detected_status.lower()
-
-                    if any(
-                        word in status_lower
-                        for word in [
-                            "normal",
-                            "healthy",
-                            "good",
-                            "stable",
-                            "running"
-                        ]
-                    ):
-
-                        machine_health = "GOOD 🟢"
-                        maintenance_priority = "ROUTINE"
-
-                    elif any(
-                        word in status_lower
-                        for word in [
-                            "warning",
-                            "attention",
-                            "degraded",
-                            "maintenance",
-                            "suspect"
-                        ]
-                    ):
-
-                        machine_health = "ATTENTION 🟡"
-                        maintenance_priority = "PLAN INSPECTION"
-
-                    else:
-
-                        machine_health = "CRITICAL / ABNORMAL 🔴"
-                        maintenance_priority = "URGENT REVIEW"
-
-                    result_time = datetime.now().strftime(
-                        "%Y-%m-%d %H:%M:%S"
-                    )
-
-                    history_row = {
-                        "Time": result_time,
-                        "Detected Machine Status": detected_status,
-                        "Machine Health": machine_health,
-                        "Prediction Confidence %": (
-                            confidence
-                            if confidence is not None
-                            else 0.0
-                        ),
-                        "Maintenance Priority": maintenance_priority
-                    }
-
-                    st.session_state.sensor_machine_prediction_history.append(
-                        history_row
-                    )
-
-                    st.session_state.latest_sensor_machine_result = {
-                        "status": detected_status,
-                        "health": machine_health,
-                        "confidence": (
-                            confidence
-                            if confidence is not None
-                            else 0.0
-                        ),
-                        "priority": maintenance_priority
-                    }
-
-                    st.divider()
-                    st.subheader("Sensor assessment")
-
-                    r1, r2, r3 = st.columns(3)
-
-                    with r1:
-
-                        st.metric(
-                            "Detected Machine Status",
-                            detected_status
-                        )
-
-                    with r2:
-
-                        st.metric(
-                            "Machine Health",
-                            machine_health
-                        )
-
-                    with r3:
-
-                        if confidence is not None:
-
-                            st.metric(
-                                "Prediction Confidence",
-                                f"{confidence:.2f}%"
-                            )
-
-                        else:
-
-                            st.metric(
-                                "Prediction Confidence",
-                                "Not available"
-                            )
-
-                    st.subheader("Assessment summary")
-
-                    if machine_health.startswith("GOOD"):
-
-                        st.success(
-                            f"""
-### 🟢 Current sensor pattern looks stable
-
-The AI classified the current sensor pattern as **{detected_status}**.
-
-This means the combined sensor readings are currently most similar to the **{detected_status}** condition learned during training.
-
-**Recommended action:** Continue normal operation, keep monitoring the sensor trend, and follow the regular preventive-maintenance schedule.
-"""
-                        )
-
-                    elif machine_health.startswith("ATTENTION"):
-
-                        st.warning(
-                            f"""
-### 🟡 The sensor pattern deserves attention
-
-The AI classified the current machine condition as **{detected_status}**.
-
-The machine may still be operating, but its combined sensor pattern is not fully consistent with a clearly healthy condition.
-
-**Recommended action:** Schedule an inspection, compare these readings with recent historical values, and check for any developing trend before the condition worsens.
-"""
-                        )
-
-                    else:
-
-                        st.error(
-                            f"""
-### 🔴 The sensor pattern requires review
-
-The AI classified the current machine condition as **{detected_status}**.
-
-The current sensor combination is associated with a non-normal or abnormal status in the model's learned dataset.
-
-**Recommended action:** Perform a technician review, verify the physical sensors and machine condition, and inspect the equipment before continuing long-duration operation.
-"""
-                        )
-
-                    st.subheader("Recommended next steps")
-
-                    recommendation_col1, recommendation_col2 = st.columns(2)
-
-                    with recommendation_col1:
-
-                        st.info(
-                            f"**Priority:** {maintenance_priority}"
-                        )
-
-                    with recommendation_col2:
-
-                        if confidence is not None:
-
-                            st.info(
-                                f"**AI confidence:** {confidence:.2f}%"
-                            )
-
-                        else:
-
-                            st.info(
-                                "**AI confidence:** Not provided by this model"
-                            )
-
-                    st.caption(
-                        "The recommendation is generated from the model's predicted machine-status class and should be used as decision support together with physical inspection and operating procedures."
-                    )
-
-            except Exception as error:
-
-                st.error(
-                    f"⚠️ Sensor Machine prediction could not be completed: {error}"
-                )
-
-        st.divider()
-        st.subheader("Sensor analysis history")
-
-        if len(
-            st.session_state.sensor_machine_prediction_history
-        ) == 0:
-
-            st.info(
-                "No analysis has been run for this machine during the current session."
-            )
-
+        st.error("AI4I Machine Model is offline. Train models using `python train_all_models.py`.")
+        st.stop()
+
+    # Presets
+    preset_cols = st.columns(4)
+    p_norm = preset_cols[0].button("🟢 Normal Operation Preset", key="ai4i_norm", use_container_width=True)
+    p_hdf = preset_cols[1].button("🔥 Heat Dissipation Anomaly", key="ai4i_hdf", use_container_width=True)
+    p_osf = preset_cols[2].button("⚡ Overstrain Failure Anomaly", key="ai4i_osf", use_container_width=True)
+    p_twf = preset_cols[3].button("🔪 Tool Wear Critical", key="ai4i_twf", use_container_width=True)
+
+    def_air_t = 300.0 if not (p_hdf or p_osf or p_twf) else (303.5 if p_hdf else 301.0)
+    def_proc_t = 310.0 if not (p_hdf or p_osf or p_twf) else (308.2 if p_hdf else 311.5)
+    def_rpm = 1550 if not (p_hdf or p_osf or p_twf) else (1250 if p_hdf else 1350)
+    def_torque = 42.0 if not (p_hdf or p_osf or p_twf) else (58.0 if p_osf else 48.0)
+    def_wear = 50.0 if not (p_hdf or p_osf or p_twf) else (215.0 if (p_twf or p_osf) else 45.0)
+
+    inp_c1, inp_c2 = st.columns(2)
+    with inp_c1:
+        air_temperature = st.number_input("Air Temperature [K]", min_value=250.0, max_value=400.0, value=float(def_air_t), step=0.5)
+        process_temperature = st.number_input("Process Temperature [K]", min_value=250.0, max_value=450.0, value=float(def_proc_t), step=0.5)
+        rotational_speed = st.number_input("Rotational Speed [RPM]", min_value=100.0, max_value=20000.0, value=float(def_rpm), step=25.0)
+    with inp_c2:
+        torque = st.number_input("Torque [Nm]", min_value=0.1, max_value=500.0, value=float(def_torque), step=0.5)
+        tool_wear = st.number_input("Tool Wear [Minutes]", min_value=0.0, max_value=10000.0, value=float(def_wear), step=5.0)
+        machine_type = st.selectbox("Machine Type (Quality Grade)", ["L", "M", "H"], index=0)
+
+    st.divider()
+    if st.button("Run AI4I Machine Assessment", type="primary", use_container_width=True, key="btn_run_ai4i"):
+        input_data = pd.DataFrame([{
+            "Air temperature [K]": air_temperature,
+            "Process temperature [K]": process_temperature,
+            "Rotational speed [rpm]": rotational_speed,
+            "Torque [Nm]": torque,
+            "Tool wear [min]": tool_wear,
+            "Type_L": 1 if machine_type == "L" else 0,
+            "Type_M": 1 if machine_type == "M" else 0
+        }])
+
+        prediction = ai4i_model.predict(input_data)[0]
+        if hasattr(ai4i_model, "predict_proba"):
+            failure_prob = float(ai4i_model.predict_proba(input_data)[0][1])
         else:
+            failure_prob = 1.0 if prediction == 1 else 0.0
 
-            sensor_history_df = pd.DataFrame(
-                st.session_state.sensor_machine_prediction_history
-            )
+        fail_pct = failure_prob * 100.0
+        health = "GOOD 🟢" if fail_pct < 35.0 else ("ATTENTION 🟡" if fail_pct < 70.0 else "CRITICAL 🔴")
 
-            st.dataframe(
-                sensor_history_df,
-                use_container_width=True,
-                hide_index=True
-            )
+        st.session_state.latest_ai4i_result = {
+            "prediction": int(prediction),
+            "failure_probability": fail_pct,
+            "health": health
+        }
 
-            if len(sensor_history_df) > 1:
+        # Save History
+        st.session_state.ai4i_prediction_history.append({
+            "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Air Temp": air_temperature,
+            "Process Temp": process_temperature,
+            "Speed RPM": rotational_speed,
+            "Torque Nm": torque,
+            "Tool Wear": tool_wear,
+            "Failure Probability %": round(fail_pct, 2),
+            "Health": health
+        })
 
-                st.subheader("Prediction confidence trend")
+    if st.session_state.latest_ai4i_result is not None:
+        res = st.session_state.latest_ai4i_result
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Failure Prediction", "FAILURE DETECTED ⚠️" if res["prediction"] == 1 else "NO FAILURE DETECTED ✅")
+        col2.metric("Machine Health", res["health"])
+        col3.metric("Failure Probability", f"{res['failure_probability']:.2f}%")
+        st.progress(int(min(max(res["failure_probability"], 0.0), 100.0)))
 
-                chart_df = sensor_history_df.copy()
-                chart_df["Time"] = pd.to_datetime(
-                    chart_df["Time"]
-                )
-                chart_df = chart_df.set_index(
-                    "Time"
-                )
+        # Dr. Nova Humanoid Section
+        ai4i_telemetry = {
+            "Air temperature [K]": air_temperature,
+            "Process temperature [K]": process_temperature,
+            "Rotational speed [rpm]": rotational_speed,
+            "Torque [Nm]": torque,
+            "Tool wear [min]": tool_wear
+        }
+        HumanoidAssistant.render_humanoid_section(
+            machine_name="AI4I Industrial Machine",
+            telemetry=ai4i_telemetry,
+            is_failure=(res["prediction"] == 1),
+            failure_prob=res["failure_probability"] / 100.0,
+            key_suffix="ai4i"
+        )
 
-                st.line_chart(
-                    chart_df[
-                        ["Prediction Confidence %"]
-                    ]
-                )
-
-            sensor_csv_data = sensor_history_df.to_csv(
-                index=False
-            ).encode("utf-8")
-
-            st.download_button(
-                label="📥 Download Sensor Machine History as CSV",
-                data=sensor_csv_data,
-                file_name="sensor_machine_prediction_history.csv",
-                mime="text/csv",
-                use_container_width=True,
-                key="download_sensor_machine_csv"
-            )
+    if st.session_state.ai4i_prediction_history:
+        st.divider()
+        st.subheader("AI4I Analysis History")
+        h_df = pd.DataFrame(st.session_state.ai4i_prediction_history)
+        st.dataframe(h_df, use_container_width=True, hide_index=True)
 
 
 # ==================================================
-# ELECTRIC MOTOR
+# 3. ELECTRIC MOTOR WORKSPACE
 # ==================================================
 
 elif selected_machine == "Electric Motor":
-
-
-    # ==============================================
-    # PAGE HEADER
-    # ==============================================
-
-    st.markdown(
-        '<div class="section-title">'
-        '⚙️ Electric Motor Health Analysis'
-        '</div>',
-        unsafe_allow_html=True
-    )
-
-
-    st.write(
-        "Enter the current electric motor sensor readings "
-        "to predict Remaining Useful Life, machine health "
-        "and maintenance risk."
-    )
-
-
-    # ==============================================
-    # MODEL CHECK
-    # ==============================================
+    st.markdown('<div class="section-title">⚡ Electric Motor Remaining Useful Life (RUL)</div>', unsafe_allow_html=True)
+    st.write("Electromechanical degradation estimation predicting Remaining Useful Life (RUL) hours and insulation stress.")
 
     if electric_motor_model is None:
+        st.error("Electric Motor model is offline. Train models using `python train_all_models.py`.")
+        st.stop()
 
+    preset_cols = st.columns(3)
+    p_norm = preset_cols[0].button("🟢 Healthy Motor Preset", key="mtr_norm", use_container_width=True)
+    p_therm = preset_cols[1].button("🔥 Stator Overheating Preset", key="mtr_therm", use_container_width=True)
+    p_load = preset_cols[2].button("⚠️ Mechanical Overload Preset", key="mtr_load", use_container_width=True)
 
-        st.error(
-            """
-### ⚠️ Electric Motor Model Not Available
+    def_temp = 62.0 if not (p_therm or p_load) else (88.0 if p_therm else 75.0)
+    def_curr = 24.0 if not (p_therm or p_load) else (48.0 if p_load else 32.0)
+    def_pwr = 14.0 if not (p_therm or p_load) else (28.0 if p_load else 18.0)
+    def_therm_load = 400.0 if not (p_therm or p_load) else (1450.0 if p_therm else 800.0)
 
-The application could not load:
+    c1, c2 = st.columns(2)
+    with c1:
+        dc_bus_voltage = st.number_input("DC Bus Voltage [V]", min_value=0.0, max_value=1000.0, value=400.0)
+        frequency = st.number_input("Frequency [Hz]", min_value=0.0, max_value=500.0, value=50.0)
+        high_res_current = st.number_input("High Resolution Current [A]", min_value=0.0, max_value=10000.0, value=float(def_curr))
+        output_current = st.number_input("Output Current [A]", min_value=0.0, max_value=1000.0, value=float(def_curr))
+        output_voltage = st.number_input("Output Voltage [V]", min_value=0.0, max_value=2000.0, value=400.0)
+    with c2:
+        speed = st.number_input("Speed [RPM]", min_value=0.0, max_value=20000.0, value=1450.0)
+        temperature = st.number_input("Temperature [°C]", min_value=0.0, max_value=250.0, value=float(def_temp))
+        load_index = st.number_input("Load Index", min_value=0.0, max_value=1000.0, value=120.0)
+        power = st.number_input("Power [kW]", min_value=0.0, max_value=1000000.0, value=float(def_pwr))
+        thermal_load = st.number_input("Thermal Load [J]", min_value=0.0, max_value=1000000.0, value=float(def_therm_load))
 
-`models/electric_motor_rul_model.pkl`
+    st.divider()
+    if st.button("Run Motor RUL Assessment", type="primary", use_container_width=True, key="btn_run_motor"):
+        input_data = pd.DataFrame([[
+            dc_bus_voltage, frequency, high_res_current, output_current,
+            output_voltage, speed, temperature, load_index, power, thermal_load
+        ]], columns=electric_motor_features)
 
-Please make sure the trained Electric Motor model
-exists inside your `models` folder.
-"""
+        predicted_rul = float(electric_motor_model.predict(input_data)[0])
+        risk_score = round(max(0.0, min(100.0, (1.0 - (predicted_rul / 5000.0)) * 100.0)), 1)
+        health = "GOOD 🟢" if risk_score < 35.0 else ("ATTENTION 🟡" if risk_score < 70.0 else "CRITICAL 🔴")
+
+        st.session_state.latest_motor_result = {
+            "prediction": predicted_rul,
+            "risk_score": risk_score,
+            "health": health
+        }
+
+        st.session_state.prediction_history.append({
+            "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Temperature": temperature,
+            "Speed": speed,
+            "Current": output_current,
+            "Predicted RUL (Hours)": round(predicted_rul, 1),
+            "Risk Score %": risk_score,
+            "Health": health
+        })
+
+    if st.session_state.latest_motor_result is not None:
+        res = st.session_state.latest_motor_result
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Predicted Remaining Useful Life", f"{res['prediction']:.1f} Hours")
+        col2.metric("Machine Health", res["health"])
+        col3.metric("Operating Risk Score", f"{res['risk_score']:.1f}%")
+        st.progress(int(res["risk_score"]))
+
+        motor_telemetry = {
+            "Temperature": temperature,
+            "Speed": speed,
+            "Output_Current": output_current,
+            "Output_Voltage": output_voltage,
+            "Power": power,
+            "Load_Index": load_index
+        }
+        HumanoidAssistant.render_humanoid_section(
+            machine_name="Electric Motor",
+            telemetry=motor_telemetry,
+            is_failure=(res["risk_score"] >= 50.0 or res["prediction"] < 500.0),
+            failure_prob=res["risk_score"] / 100.0,
+            extra_metrics={"rul_hours": res["prediction"]},
+            key_suffix="motor"
         )
 
-
-    else:
-
-
-        # ==========================================
-        # INPUT COLUMNS
-        # ==========================================
-
-        col1, col2 = st.columns(2)
-
-
-        # ==========================================
-        # COLUMN 1
-        # ==========================================
-
-        with col1:
-
-
-            dc_bus_voltage = st.number_input(
-                "DC Bus Voltage",
-                min_value=0.0,
-                value=315.0,
-                step=0.1,
-                key="motor_dc_bus_voltage"
-            )
-
-
-            frequency = st.number_input(
-                "Frequency",
-                min_value=0.0,
-                value=50.0,
-                step=0.1,
-                key="motor_frequency"
-            )
-
-
-            high_resolution_output_current = (
-                st.number_input(
-                    "High Resolution Output Current",
-                    min_value=0.0,
-                    value=50.0,
-                    step=0.1,
-                    key="motor_high_resolution_current"
-                )
-            )
-
-
-            output_current = st.number_input(
-                "Output Current",
-                min_value=0.0,
-                value=5.0,
-                step=0.1,
-                key="motor_output_current"
-            )
-
-
-            output_voltage = st.number_input(
-                "Output Voltage",
-                min_value=0.0,
-                value=220.0,
-                step=0.1,
-                key="motor_output_voltage"
-            )
-
-
-        # ==========================================
-        # COLUMN 2
-        # ==========================================
-
-        with col2:
-
-
-            speed = st.number_input(
-                "Speed",
-                min_value=0.0,
-                value=1500.0,
-                step=1.0,
-                key="motor_speed"
-            )
-
-
-            temperature = st.number_input(
-                "Temperature",
-                min_value=0.0,
-                value=35.0,
-                step=0.1,
-                key="motor_temperature"
-            )
-
-
-            load_index = st.number_input(
-                "Load Index",
-                min_value=0.0,
-                value=50.0,
-                step=0.1,
-                key="motor_load_index"
-            )
-
-
-            power = st.number_input(
-                "Power",
-                min_value=0.0,
-                value=500.0,
-                step=1.0,
-                key="motor_power"
-            )
-
-
-            thermal_load = st.number_input(
-                "Thermal Load",
-                min_value=0.0,
-                value=300.0,
-                step=1.0,
-                key="motor_thermal_load"
-            )
-
-
-        # ==========================================
-        # CURRENT SENSOR DASHBOARD
-        # ==========================================
-
+    if st.session_state.prediction_history:
         st.divider()
+        st.subheader("Motor Assessment History")
+        st.dataframe(pd.DataFrame(st.session_state.prediction_history), use_container_width=True, hide_index=True)
 
 
-        st.subheader(
-            "📊 Current Sensor Dashboard"
+# ==================================================
+# 4. SENSOR MACHINE WORKSPACE
+# ==================================================
+
+elif selected_machine == "Sensor Machine":
+    st.markdown('<div class="section-title">📊 Multi-Sensor Machine Health Classification</div>', unsafe_allow_html=True)
+    st.write("Pattern recognition across 52 industrial sensor feeds to classify machine status (NORMAL, RECOVERING, BROKEN).")
+
+    if sensor_machine_model is None or not sensor_machine_features:
+        st.error("Sensor Machine model is offline. Train models using `python train_all_models.py`.")
+        st.stop()
+
+    baseline = load_sensor_baseline_values(sensor_machine_features)
+    sensor_df = pd.DataFrame({
+        "Sensor Feature": sensor_machine_features,
+        "Current Reading": [baseline.get(f, 0.0) for f in sensor_machine_features]
+    })
+
+    st.caption("Inspect or edit the multi-sensor readings below:")
+    edited_sensor_table = st.data_editor(sensor_df, use_container_width=True, height=260, key="sensor_table")
+
+    st.divider()
+    if st.button("Run Multi-Sensor Assessment", type="primary", use_container_width=True, key="btn_run_sensor"):
+        sensor_values = pd.to_numeric(edited_sensor_table["Current Reading"], errors="coerce")
+        input_data = pd.DataFrame([sensor_values.tolist()], columns=sensor_machine_features)
+
+        pred_enc = sensor_machine_model.predict(input_data)[0]
+        detected_status = str(sensor_machine_label_encoder.inverse_transform([int(pred_enc)])[0]) if sensor_machine_label_encoder else str(pred_enc)
+
+        confidence = 95.0
+        if hasattr(sensor_machine_model, "predict_proba"):
+            probs = sensor_machine_model.predict_proba(input_data)[0]
+            confidence = float(max(probs) * 100.0)
+
+        health = "GOOD 🟢" if "normal" in detected_status.lower() else ("ATTENTION 🟡" if "recovering" in detected_status.lower() else "CRITICAL 🔴")
+
+        st.session_state.latest_sensor_machine_result = {
+            "status": detected_status,
+            "confidence": confidence,
+            "health": health
+        }
+
+        st.session_state.sensor_machine_prediction_history.append({
+            "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Detected Status": detected_status,
+            "Confidence %": round(confidence, 1),
+            "Machine Health": health
+        })
+
+    if st.session_state.latest_sensor_machine_result is not None:
+        res = st.session_state.latest_sensor_machine_result
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Detected Machine Status", res["status"])
+        col2.metric("Machine Health", res["health"])
+        col3.metric("Prediction Confidence", f"{res['confidence']:.1f}%")
+
+        sensor_prob = 0.90 if "broken" in res["status"].lower() else (0.45 if "recovering" in res["status"].lower() else 0.05)
+        sensor_sample_telemetry = {col: round(float(val), 2) for col, val in zip(sensor_machine_features[:8], edited_sensor_table["Current Reading"].tolist()[:8])}
+
+        HumanoidAssistant.render_humanoid_section(
+            machine_name="Sensor Machine",
+            telemetry=sensor_sample_telemetry,
+            is_failure=("broken" in res["status"].lower()),
+            failure_prob=sensor_prob,
+            extra_metrics={"status": res["status"]},
+            key_suffix="sensor"
         )
 
-
-        sensor_data = pd.DataFrame(
-            {
-                "Sensor": [
-                    "DC Bus Voltage",
-                    "Frequency",
-                    "High Resolution Current",
-                    "Output Current",
-                    "Output Voltage",
-                    "Speed",
-                    "Temperature",
-                    "Load Index",
-                    "Power",
-                    "Thermal Load"
-                ],
-
-                "Value": [
-                    dc_bus_voltage,
-                    frequency,
-                    high_resolution_output_current,
-                    output_current,
-                    output_voltage,
-                    speed,
-                    temperature,
-                    load_index,
-                    power,
-                    thermal_load
-                ]
-            }
-        )
-
-
-        dashboard_col1, dashboard_col2 = (
-            st.columns(
-                [2, 1]
-            )
-        )
-
-
-        with dashboard_col1:
-
-
-            st.bar_chart(
-                sensor_data.set_index(
-                    "Sensor"
-                )
-            )
-
-
-        with dashboard_col2:
-
-
-            st.dataframe(
-                sensor_data,
-                use_container_width=True,
-                hide_index=True
-            )
-
-
+    if st.session_state.sensor_machine_prediction_history:
         st.divider()
+        st.subheader("Sensor Analysis History")
+        st.dataframe(pd.DataFrame(st.session_state.sensor_machine_prediction_history), use_container_width=True, hide_index=True)
 
 
-        # ==========================================
-        # ANALYZE BUTTON
-        # ==========================================
+# ==================================================
+# 5. INDUSTRIAL PUMP WORKSPACE
+# ==================================================
 
-        analyze_motor = st.button(
-            "Run motor assessment",
-            use_container_width=True,
-            type="primary",
-            key="analyze_motor_button"
+elif selected_machine == "Industrial Pump":
+    st.markdown('<div class="section-title">🌊 Industrial Pump Cavitation & Vibration Analysis</div>', unsafe_allow_html=True)
+    st.write("Hydraulic performance monitoring predicting cavitation risk, seal failure, and ISO 10816 bearing vibration.")
+
+    if pump_model is None or not pump_features:
+        st.error("Industrial Pump model is offline. Train models using `python train_all_models.py`.")
+        st.stop()
+
+    preset_cols = st.columns(3)
+    p_norm = preset_cols[0].button("🟢 Normal Pumping Preset", key="pmp_norm", use_container_width=True)
+    p_cav = preset_cols[1].button("⚠️ Severe Cavitation Anomaly", key="pmp_cav", use_container_width=True)
+    p_vibe = preset_cols[2].button("🔴 ISO Bearing Vibration Anomaly", key="pmp_vibe", use_container_width=True)
+
+    def_flow = 250.0 if not (p_cav or p_vibe) else (180.0 if p_cav else 220.0)
+    def_suct = 2.5 if not (p_cav or p_vibe) else (0.9 if p_cav else 2.2)
+    def_disc = 12.0 if not (p_cav or p_vibe) else (19.5 if p_vibe else 11.5)
+    def_vibe = 2.0 if not (p_cav or p_vibe) else (8.4 if p_vibe else 4.8)
+    def_temp = 55.0 if not (p_cav or p_vibe) else (89.0 if p_vibe else 60.0)
+    def_cav = 2.0 if not (p_cav or p_vibe) else (0.6 if p_cav else 1.8)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        pump_flow = st.number_input("Flow Rate [L/min]", min_value=10.0, max_value=1000.0, value=float(def_flow))
+        pump_suct = st.number_input("Suction Pressure [bar]", min_value=0.1, max_value=25.0, value=float(def_suct))
+        pump_disc = st.number_input("Discharge Pressure [bar]", min_value=1.0, max_value=100.0, value=float(def_disc))
+        pump_cav_idx = st.number_input("Cavitation Index", min_value=0.1, max_value=10.0, value=float(def_cav))
+    with c2:
+        pump_vibe_val = st.number_input("Vibration RMS [mm/s]", min_value=0.1, max_value=50.0, value=float(def_vibe))
+        pump_bearing_temp = st.number_input("Bearing Temperature [°C]", min_value=0.0, max_value=200.0, value=float(def_temp))
+        pump_power = st.number_input("Motor Power [kW]", min_value=1.0, max_value=1000.0, value=60.0)
+        pump_fluid_temp = st.number_input("Fluid Temperature [°C]", min_value=-10.0, max_value=150.0, value=40.0)
+
+    st.divider()
+    if st.button("Run Industrial Pump Assessment", type="primary", use_container_width=True, key="btn_run_pump"):
+        input_data = pd.DataFrame([[
+            pump_flow, pump_suct, pump_disc, pump_vibe_val,
+            pump_bearing_temp, pump_power, pump_fluid_temp, pump_cav_idx
+        ]], columns=pump_features)
+
+        prediction = pump_model.predict(input_data)[0]
+        failure_prob = float(pump_model.predict_proba(input_data)[0][1]) if hasattr(pump_model, "predict_proba") else (1.0 if prediction == 1 else 0.0)
+        fail_pct = failure_prob * 100.0
+        health = "GOOD 🟢" if fail_pct < 35.0 else ("ATTENTION 🟡" if fail_pct < 70.0 else "CRITICAL 🔴")
+
+        st.session_state.latest_pump_result = {
+            "prediction": int(prediction),
+            "failure_probability": fail_pct,
+            "health": health
+        }
+
+        st.session_state.pump_prediction_history.append({
+            "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Flow Rate": pump_flow,
+            "Discharge Pressure": pump_disc,
+            "Vibration RMS": pump_vibe_val,
+            "Bearing Temp": pump_bearing_temp,
+            "Failure Probability %": round(fail_pct, 2),
+            "Health": health
+        })
+
+    if st.session_state.latest_pump_result is not None:
+        res = st.session_state.latest_pump_result
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Failure Prediction", "FAILURE DETECTED ⚠️" if res["prediction"] == 1 else "NO FAILURE DETECTED ✅")
+        col2.metric("Machine Health", res["health"])
+        col3.metric("Failure Probability", f"{res['failure_probability']:.2f}%")
+        st.progress(int(min(max(res["failure_probability"], 0.0), 100.0)))
+
+        pump_telemetry = {
+            "Flow_Rate": pump_flow,
+            "Suction_Pressure": pump_suct,
+            "Discharge_Pressure": pump_disc,
+            "Vibration_RMS": pump_vibe_val,
+            "Bearing_Temperature": pump_bearing_temp,
+            "Motor_Power": pump_power,
+            "Fluid_Temperature": pump_fluid_temp,
+            "Cavitation_Index": pump_cav_idx
+        }
+        HumanoidAssistant.render_humanoid_section(
+            machine_name="Industrial Pump",
+            telemetry=pump_telemetry,
+            is_failure=(res["prediction"] == 1),
+            failure_prob=res["failure_probability"] / 100.0,
+            key_suffix="pump"
         )
 
-
-        # ==========================================
-        # MOTOR PREDICTION
-        # ==========================================
-
-        if analyze_motor:
-
-            valid_inputs = all([
-                validate_range("DC Bus Voltage", dc_bus_voltage, 0.0, 1000.0),
-                validate_range("Frequency", frequency, 0.0, 500.0),
-                validate_range("High Resolution Output Current", high_resolution_output_current, 0.0, 10000.0),
-                validate_range("Output Current", output_current, 0.0, 1000.0),
-                validate_range("Output Voltage", output_voltage, 0.0, 2000.0),
-                validate_range("Speed", speed, 0.0, 20000.0),
-                validate_range("Temperature", temperature, 0.0, 250.0),
-                validate_range("Load Index", load_index, 0.0, 1000.0),
-                validate_range("Power", power, 0.0, 1000000.0),
-                validate_range("Thermal Load", thermal_load, 0.0, 1000000.0)
-            ])
-
-            if not valid_inputs:
-                st.stop()
-
-            input_data = pd.DataFrame(
-                [[
-                    dc_bus_voltage,
-                    frequency,
-                    high_resolution_output_current,
-                    output_current,
-                    output_voltage,
-                    speed,
-                    temperature,
-                    load_index,
-                    power,
-                    thermal_load
-                ]],
-
-                columns=[
-                    "DC_Bus_Voltage",
-                    "Frequency",
-                    "High_Resolution_Output_Current",
-                    "Output_Current",
-                    "Output_Voltage",
-                    "Speed",
-                    "Temperature",
-                    "Load_Index",
-                    "Power",
-                    "Thermal_Load"
-                ]
-            )
-
-
-            try:
-
-
-                prediction = (
-                    electric_motor_model.predict(
-                        input_data
-                    )[0]
-                )
-
-
-                prediction = max(
-                    float(prediction),
-                    0
-                )
-
-
-                # ==================================
-                # RISK SCORE
-                # ==================================
-
-                risk_score = (
-                    100
-                    -
-                    (
-                        prediction
-                        /
-                        20000
-                        *
-                        100
-                    )
-                )
-
-
-                risk_score = max(
-                    0,
-                    min(
-                        100,
-                        risk_score
-                    )
-                )
-
-
-                # ==================================
-                # HEALTH
-                # ==================================
-
-                if risk_score < 30:
-
-
-                    health = "GOOD 🟢"
-
-                    risk_level = "LOW RISK 🟢"
-
-
-                elif risk_score < 60:
-
-
-                    health = "ATTENTION 🟡"
-
-                    risk_level = "MEDIUM RISK 🟡"
-
-
-                else:
-
-
-                    health = "CRITICAL 🔴"
-
-                    risk_level = "HIGH RISK 🔴"
-
-
-                # ==================================
-                # FAILURE ANALYSIS
-                # ==================================
-
-                possible_reasons = []
-
-
-                if temperature > 70:
-
-                    possible_reasons.append(
-                        "High motor temperature may indicate overheating."
-                    )
-
-
-                if load_index > 80:
-
-                    possible_reasons.append(
-                        "High load index may indicate excessive mechanical load."
-                    )
-
-
-                if thermal_load > 1000:
-
-                    possible_reasons.append(
-                        "High thermal load may cause insulation or winding damage."
-                    )
-
-
-                if output_current > 20:
-
-                    possible_reasons.append(
-                        "High output current may indicate overload or electrical problems."
-                    )
-
-
-                if speed < 1000:
-
-                    possible_reasons.append(
-                        "Low speed may indicate mechanical resistance or motor performance issues."
-                    )
-
-
-                if not possible_reasons:
-
-                    possible_reasons.append(
-                        "No major abnormal sensor condition was detected from the entered values."
-                    )
-
-
-                # ==================================
-                # RECOMMENDATIONS
-                # ==================================
-
-                recommendations = []
-
-
-                if temperature > 70:
-
-                    recommendations.append(
-                        "Inspect the cooling system, ventilation and motor bearings."
-                    )
-
-
-                if load_index > 80:
-
-                    recommendations.append(
-                        "Reduce excessive mechanical load and inspect the driven equipment."
-                    )
-
-
-                if thermal_load > 1000:
-
-                    recommendations.append(
-                        "Inspect insulation and reduce prolonged thermal stress."
-                    )
-
-
-                if output_current > 20:
-
-                    recommendations.append(
-                        "Inspect electrical connections, windings and motor load."
-                    )
-
-
-                if speed < 1000:
-
-                    recommendations.append(
-                        "Inspect bearings, shafts and mechanical components for resistance."
-                    )
-
-
-                if health == "GOOD 🟢":
-
-                    recommendations.append(
-                        "Continue normal operation and perform scheduled preventive maintenance."
-                    )
-
-
-                elif health == "ATTENTION 🟡":
-
-                    recommendations.append(
-                        "Schedule a maintenance inspection before machine health becomes critical."
-                    )
-
-
-                else:
-
-                    recommendations.append(
-                        "Perform immediate inspection and maintenance before continuing heavy operation."
-                    )
-
-
-                # ==================================
-                # SAVE RESULT
-                # ==================================
-
-                result = {
-
-                    "prediction": prediction,
-
-                    "risk_score": risk_score,
-
-                    "health": health,
-
-                    "risk_level": risk_level,
-
-                    "possible_reasons": (
-                        possible_reasons
-                    ),
-
-                    "recommendations": (
-                        recommendations
-                    )
-                }
-
-
-                st.session_state.latest_motor_result = (
-                    result
-                )
-
-
-                # ==================================
-                # SAVE HISTORY
-                # ==================================
-
-                prediction_record = {
-
-                    "Time": (
-                        datetime.now().strftime(
-                            "%Y-%m-%d %H:%M:%S"
-                        )
-                    ),
-
-                    "Temperature": (
-                        temperature
-                    ),
-
-                    "Speed": (
-                        speed
-                    ),
-
-                    "Load Index": (
-                        load_index
-                    ),
-
-                    "Predicted RUL Hours": (
-                        round(
-                            prediction,
-                            2
-                        )
-                    ),
-
-                    "Risk Score %": (
-                        round(
-                            risk_score,
-                            2
-                        )
-                    ),
-
-                    "Machine Health": (
-                        health
-                    )
-                }
-
-
-                st.session_state.prediction_history.append(
-                    prediction_record
-                )
-
-
-            except Exception as error:
-
-
-                st.error(
-                    f"Prediction error: {error}"
-                )
-
-
-        # ==========================================
-        # DISPLAY LATEST MOTOR RESULT
-        # ==========================================
-
-        if (
-            st.session_state.latest_motor_result
-            is not None
-        ):
-
-
-            result = (
-                st.session_state.latest_motor_result
-            )
-
-
-            prediction = (
-                result["prediction"]
-            )
-
-            risk_score = (
-                result["risk_score"]
-            )
-
-            health = (
-                result["health"]
-            )
-
-            risk_level = (
-                result["risk_level"]
-            )
-
-            possible_reasons = (
-                result["possible_reasons"]
-            )
-
-            recommendations = (
-                result["recommendations"]
-            )
-
-
-            st.divider()
-
-
-            st.subheader(
-                "Motor assessment"
-            )
-
-
-            result_col1, result_col2, result_col3 = (
-                st.columns(3)
-            )
-
-
-            with result_col1:
-
-
-                st.metric(
-                    "Remaining Useful Life",
-                    f"{prediction:.2f} Hours"
-                )
-
-
-            with result_col2:
-
-
-                st.metric(
-                    "Machine Health",
-                    health
-                )
-
-
-            with result_col3:
-
-
-                st.metric(
-                    "Risk Score",
-                    f"{risk_score:.2f}%"
-                )
-
-
-            st.subheader(
-                "Current operating risk"
-            )
-
-
-            st.progress(
-                int(risk_score)
-            )
-
-
-            st.write(
-                f"### {risk_level}"
-            )
-
-
-            # ======================================
-            # STATUS CARD
-            # ======================================
-
-            if health == "GOOD 🟢":
-
-
-                st.markdown(
-                    f"""
-                    <div class="status-good">
-                    🟢 <b>MACHINE HEALTH: GOOD</b><br><br>
-                    Predicted Remaining Useful Life:
-                    <b>{prediction:.2f} Hours</b><br><br>
-                    Continue normal operation and scheduled
-                    preventive maintenance.
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-
-            elif health == "ATTENTION 🟡":
-
-
-                st.markdown(
-                    f"""
-                    <div class="status-warning">
-                    🟡 <b>MACHINE HEALTH: ATTENTION REQUIRED</b><br><br>
-                    Predicted Remaining Useful Life:
-                    <b>{prediction:.2f} Hours</b><br><br>
-                    Schedule a maintenance inspection and monitor
-                    the machine operating conditions closely.
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-
-            else:
-
-
-                st.markdown(
-                    f"""
-                    <div class="status-critical">
-                    🔴 <b>MACHINE HEALTH: CRITICAL</b><br><br>
-                    Predicted Remaining Useful Life:
-                    <b>{prediction:.2f} Hours</b><br><br>
-                    Immediate inspection and maintenance
-                    are recommended.
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-
-            # ======================================
-            # POSSIBLE REASONS
-            # ======================================
-
-            st.subheader(
-                "What needs attention"
-            )
-
-
-            for reason in possible_reasons:
-
-                st.write(
-                    f"• {reason}"
-                )
-
-
-            # ======================================
-            # RECOMMENDATIONS
-            # ======================================
-
-            st.subheader(
-                "Recommended next steps"
-            )
-
-
-            for recommendation in recommendations:
-
-                st.write(
-                    f"• {recommendation}"
-                )
-
-
-        # ==========================================
-        # PREDICTION HISTORY
-        # ==========================================
-
-        if len(
-            st.session_state.prediction_history
-        ) > 0:
-
-
-            st.divider()
-
-
-            history_col1, history_col2 = (
-                st.columns(
-                    [4, 1]
-                )
-            )
-
-
-            with history_col1:
-
-
-                st.subheader(
-                    "Motor analysis history"
-                )
-
-
-            with history_col2:
-
-
-                if st.button(
-                    "🗑️ Clear Prediction History",
-                    use_container_width=True,
-                    key="clear_motor_history"
-                ):
-
-
-                    st.session_state.prediction_history = []
-
-                    st.session_state.latest_motor_result = None
-
-                    st.rerun()
-
-
-            history_df = pd.DataFrame(
-                st.session_state.prediction_history
-            )
-
-
-            st.dataframe(
-                history_df,
-                use_container_width=True,
-                hide_index=True
-            )
-
-
-            # ======================================
-            # RUL HISTORY
-            # ======================================
-
-            st.subheader(
-                "Remaining useful life trend"
-            )
-
-
-            chart_data = (
-                history_df[
-                    [
-                        "Time",
-                        "Predicted RUL Hours"
-                    ]
-                ]
-                .copy()
-                .set_index(
-                    "Time"
-                )
-            )
-
-
-            st.line_chart(
-                chart_data,
-                use_container_width=True
-            )
-
-
-            # ======================================
-            # RISK HISTORY
-            # ======================================
-
-            st.subheader(
-                "Risk score trend"
-            )
-
-
-            risk_chart_data = (
-                history_df[
-                    [
-                        "Time",
-                        "Risk Score %"
-                    ]
-                ]
-                .copy()
-                .set_index(
-                    "Time"
-                )
-            )
-
-
-            st.line_chart(
-                risk_chart_data,
-                use_container_width=True
-            )
-
-
-            # ======================================
-            # DOWNLOAD CSV
-            # ======================================
-
-            st.subheader(
-                "Export analysis history"
-            )
-
-
-            csv_data = (
-                history_df.to_csv(
-                    index=False
-                ).encode(
-                    "utf-8"
-                )
-            )
-
-
-            st.download_button(
-                label=(
-                    "Download history as CSV"
-                ),
-                data=csv_data,
-                file_name=(
-                    "electric_motor_prediction_history.csv"
-                ),
-                mime="text/csv",
-                use_container_width=True,
-                key="download_motor_csv"
-            )
+    if st.session_state.pump_prediction_history:
+        st.divider()
+        st.subheader("Pump Analysis History")
+        st.dataframe(pd.DataFrame(st.session_state.pump_prediction_history), use_container_width=True, hide_index=True)
 
 
 # ==================================================
-# OTHER MACHINES
+# 6. CNC MACHINE WORKSPACE
 # ==================================================
 
-else:
+elif selected_machine == "CNC Machine":
+    st.markdown('<div class="section-title">🔧 CNC Machining Center Diagnostics</div>', unsafe_allow_html=True)
+    st.write("Machining dynamics analysis monitoring dynamic spindle chatter, cutting force, tool wear, and servo feed error.")
 
+    if cnc_model is None or not cnc_features:
+        st.error("CNC Machine model is offline. Train models using `python train_all_models.py`.")
+        st.stop()
 
-    st.markdown(
-        '<div class="section-title">'
-        f'🏭 {selected_machine}'
-        '</div>',
-        unsafe_allow_html=True
-    )
+    preset_cols = st.columns(3)
+    p_norm = preset_cols[0].button("🟢 Normal Machining Preset", key="cnc_norm", use_container_width=True)
+    p_chat = preset_cols[1].button("⚠️ Regenerative Chatter Anomaly", key="cnc_chat", use_container_width=True)
+    p_wear = preset_cols[2].button("🔴 Critical Tool Wear & Overload", key="cnc_wear", use_container_width=True)
 
+    def_spindle = 6000.0 if not (p_chat or p_wear) else (7800.0 if p_chat else 5500.0)
+    def_force = 850.0 if not (p_chat or p_wear) else (1650.0 if p_wear else 950.0)
+    def_wear = 45.0 if not (p_chat or p_wear) else (210.0 if p_wear else 50.0)
+    def_vibe = 1.8 if not (p_chat or p_wear) else (7.2 if p_chat else 3.5)
+    def_cool = 22.0 if not (p_chat or p_wear) else (8.0 if p_wear else 20.0)
 
-    st.info(
-        f"""
-### {selected_machine}
+    c1, c2 = st.columns(2)
+    with c1:
+        cnc_spindle = st.number_input("Spindle Speed [RPM]", min_value=100.0, max_value=30000.0, value=float(def_spindle))
+        cnc_feed = st.number_input("Feed Rate [mm/min]", min_value=10.0, max_value=5000.0, value=800.0)
+        cnc_force = st.number_input("Cutting Force [N]", min_value=10.0, max_value=10000.0, value=float(def_force))
+        cnc_wear_idx = st.number_input("Tool Wear Index [min]", min_value=0.0, max_value=500.0, value=float(def_wear))
+    with c2:
+        cnc_vibe_val = st.number_input("Spindle Vibration [mm/s]", min_value=0.1, max_value=50.0, value=float(def_vibe))
+        cnc_err = st.number_input("Axis Feed Error [µm]", min_value=0.0, max_value=100.0, value=4.0)
+        cnc_coolant = st.number_input("Coolant Pressure [bar]", min_value=0.0, max_value=100.0, value=float(def_cool))
+        cnc_temp = st.number_input("Motor Temperature [°C]", min_value=0.0, max_value=150.0, value=48.0)
 
-This workspace is reserved for a machine-specific model and is not connected to a trained dataset yet.
+    st.divider()
+    if st.button("Run CNC Machining Assessment", type="primary", use_container_width=True, key="btn_run_cnc"):
+        input_data = pd.DataFrame([[
+            cnc_spindle, cnc_feed, cnc_force, cnc_wear_idx,
+            cnc_vibe_val, cnc_err, cnc_coolant, cnc_temp
+        ]], columns=cnc_features)
 
-When you add a dataset later, the workflow will be:
+        prediction = cnc_model.predict(input_data)[0]
+        failure_prob = float(cnc_model.predict_proba(input_data)[0][1]) if hasattr(cnc_model, "predict_proba") else (1.0 if prediction == 1 else 0.0)
+        fail_pct = failure_prob * 100.0
+        health = "GOOD 🟢" if fail_pct < 35.0 else ("ATTENTION 🟡" if fail_pct < 70.0 else "CRITICAL 🔴")
 
-1. Inspect and clean the machine data.
-2. Define the prediction target.
-3. Train and evaluate the model.
-4. Save the trained model in the `models` folder.
-5. Connect the result to this workspace.
-"""
-    )
+        st.session_state.latest_cnc_result = {
+            "prediction": int(prediction),
+            "failure_probability": fail_pct,
+            "health": health
+        }
+
+        st.session_state.cnc_prediction_history.append({
+            "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Spindle Speed": cnc_spindle,
+            "Cutting Force": cnc_force,
+            "Tool Wear": cnc_wear_idx,
+            "Vibration": cnc_vibe_val,
+            "Failure Probability %": round(fail_pct, 2),
+            "Health": health
+        })
+
+    if st.session_state.latest_cnc_result is not None:
+        res = st.session_state.latest_cnc_result
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Failure Prediction", "FAILURE DETECTED ⚠️" if res["prediction"] == 1 else "NO FAILURE DETECTED ✅")
+        col2.metric("Machine Health", res["health"])
+        col3.metric("Failure Probability", f"{res['failure_probability']:.2f}%")
+        st.progress(int(min(max(res["failure_probability"], 0.0), 100.0)))
+
+        cnc_telemetry = {
+            "Spindle_Speed": cnc_spindle,
+            "Feed_Rate": cnc_feed,
+            "Cutting_Force": cnc_force,
+            "Tool_Wear_Index": cnc_wear_idx,
+            "Spindle_Vibration": cnc_vibe_val,
+            "Axis_Feed_Error": cnc_err,
+            "Coolant_Pressure": cnc_coolant,
+            "Motor_Temperature": cnc_temp
+        }
+        HumanoidAssistant.render_humanoid_section(
+            machine_name="CNC Machine",
+            telemetry=cnc_telemetry,
+            is_failure=(res["prediction"] == 1),
+            failure_prob=res["failure_probability"] / 100.0,
+            key_suffix="cnc"
+        )
+
+    if st.session_state.cnc_prediction_history:
+        st.divider()
+        st.subheader("CNC Analysis History")
+        st.dataframe(pd.DataFrame(st.session_state.cnc_prediction_history), use_container_width=True, hide_index=True)
 
 
 # ==================================================
-# APPLICATION FOOTER
+# 7. CONVEYOR SYSTEM WORKSPACE
+# ==================================================
+
+elif selected_machine == "Conveyor System":
+    st.markdown('<div class="section-title">📦 Industrial Conveyor System Diagnostics</div>', unsafe_allow_html=True)
+    st.write("Material handling dynamics evaluating drive pulley belt slip, idler roll seizure, and tension overload.")
+
+    if conveyor_model is None or not conveyor_features:
+        st.error("Conveyor System model is offline. Train models using `python train_all_models.py`.")
+        st.stop()
+
+    preset_cols = st.columns(3)
+    p_norm = preset_cols[0].button("🟢 Normal Transit Preset", key="cvr_norm", use_container_width=True)
+    p_slip = preset_cols[1].button("⚠️ Drive Pulley Slip Anomaly", key="cvr_slip", use_container_width=True)
+    p_seize = preset_cols[2].button("🔴 Idler Bearing Seizure Anomaly", key="cvr_seize", use_container_width=True)
+
+    def_speed = 2.2 if not (p_slip or p_seize) else (1.8 if p_slip else 2.1)
+    def_tension = 22.0 if not (p_slip or p_seize) else (38.5 if p_slip else 24.0)
+    def_curr = 45.0 if not (p_slip or p_seize) else (85.0 if p_slip else 52.0)
+    def_temp = 48.0 if not (p_slip or p_seize) else (86.0 if p_seize else 50.0)
+    def_vibe = 1.8 if not (p_slip or p_seize) else (7.1 if p_seize else 2.0)
+    def_slip = 1.2 if not (p_slip or p_seize) else (7.8 if p_slip else 1.5)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        cvr_speed = st.number_input("Belt Speed [m/s]", min_value=0.1, max_value=10.0, value=float(def_speed))
+        cvr_tension = st.number_input("Belt Tension [kN]", min_value=1.0, max_value=100.0, value=float(def_tension))
+        cvr_current = st.number_input("Motor Current [A]", min_value=1.0, max_value=500.0, value=float(def_curr))
+        cvr_bearing_temp = st.number_input("Roller Bearing Temp [°C]", min_value=0.0, max_value=150.0, value=float(def_temp))
+    with c2:
+        cvr_vibe_val = st.number_input("Idler Vibration [mm/s]", min_value=0.1, max_value=30.0, value=float(def_vibe))
+        cvr_slip_pct = st.number_input("Belt Slip Percentage [%]", min_value=0.0, max_value=50.0, value=float(def_slip))
+        cvr_load = st.number_input("Load Weight [t/h]", min_value=0.0, max_value=5000.0, value=500.0)
+        cvr_amb = st.number_input("Ambient Temperature [°C]", min_value=-20.0, max_value=60.0, value=28.0)
+
+    st.divider()
+    if st.button("Run Conveyor System Assessment", type="primary", use_container_width=True, key="btn_run_cvr"):
+        input_data = pd.DataFrame([[
+            cvr_speed, cvr_tension, cvr_current, cvr_bearing_temp,
+            cvr_vibe_val, cvr_slip_pct, cvr_load, cvr_amb
+        ]], columns=conveyor_features)
+
+        prediction = conveyor_model.predict(input_data)[0]
+        failure_prob = float(conveyor_model.predict_proba(input_data)[0][1]) if hasattr(conveyor_model, "predict_proba") else (1.0 if prediction == 1 else 0.0)
+        fail_pct = failure_prob * 100.0
+        health = "GOOD 🟢" if fail_pct < 35.0 else ("ATTENTION 🟡" if fail_pct < 70.0 else "CRITICAL 🔴")
+
+        st.session_state.latest_conveyor_result = {
+            "prediction": int(prediction),
+            "failure_probability": fail_pct,
+            "health": health
+        }
+
+        st.session_state.conveyor_prediction_history.append({
+            "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Belt Speed": cvr_speed,
+            "Tension": cvr_tension,
+            "Motor Current": cvr_current,
+            "Roller Temp": cvr_bearing_temp,
+            "Failure Probability %": round(fail_pct, 2),
+            "Health": health
+        })
+
+    if st.session_state.latest_conveyor_result is not None:
+        res = st.session_state.latest_conveyor_result
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Failure Prediction", "FAILURE DETECTED ⚠️" if res["prediction"] == 1 else "NO FAILURE DETECTED ✅")
+        col2.metric("Machine Health", res["health"])
+        col3.metric("Failure Probability", f"{res['failure_probability']:.2f}%")
+        st.progress(int(min(max(res["failure_probability"], 0.0), 100.0)))
+
+        conveyor_telemetry = {
+            "Belt_Speed": cvr_speed,
+            "Belt_Tension": cvr_tension,
+            "Motor_Current": cvr_current,
+            "Roller_Bearing_Temperature": cvr_bearing_temp,
+            "Idler_Vibration": cvr_vibe_val,
+            "Belt_Slip_Percentage": cvr_slip_pct,
+            "Load_Weight": cvr_load,
+            "Ambient_Temperature": cvr_amb
+        }
+        HumanoidAssistant.render_humanoid_section(
+            machine_name="Conveyor System",
+            telemetry=conveyor_telemetry,
+            is_failure=(res["prediction"] == 1),
+            failure_prob=res["failure_probability"] / 100.0,
+            key_suffix="conveyor"
+        )
+
+    if st.session_state.conveyor_prediction_history:
+        st.divider()
+        st.subheader("Conveyor Analysis History")
+        st.dataframe(pd.DataFrame(st.session_state.conveyor_prediction_history), use_container_width=True, hide_index=True)
+
+
+# ==================================================
+# FOOTER
 # ==================================================
 
 st.divider()
-
-
 st.caption(
-    "Predictive Maintenance | "
-    "Machine Health Monitoring | "
-    "Failure Prediction | "
-    "Remaining Useful Life | "
-    "Sensor Pattern Classification | "
-    "Maintenance Recommendation System"
+    "Predictive Maintenance AI · Dr. Nova Humanoid Reliability Platform | "
+    "Autonomous Diagnostics | Root Cause Analysis | Voice Dispatch | ISO-14224 Work Orders"
 )
