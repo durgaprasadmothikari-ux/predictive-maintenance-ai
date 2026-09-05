@@ -1,3 +1,11 @@
+# Large datasets
+data/sensor.csv
+
+# Python virtual environment
 venv/
+
+# Python cache
 __pycache__/
-*.pycdata/sensor.csv
+
+# Python compiled files
+*.pyc
